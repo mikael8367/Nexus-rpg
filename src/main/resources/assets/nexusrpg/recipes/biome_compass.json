@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [" M ", "MCM", " M "],
+  "key": {
+    "M": {"item": "nexusrpg:mithril_ingot"},
+    "C": {"item": "minecraft:compass"}
+  },
+  "result": {"item": "nexusrpg:biome_compass"}
+}
