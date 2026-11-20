@@ -1,7 +1,9 @@
 package com.nexusrpg;
 
 import com.nexusrpg.init.ModBlocks;
+import com.nexusrpg.compass.CompassNetwork;
 import com.nexusrpg.init.ModItems;
+import com.nexusrpg.init.NexusCreativeTab;
 import com.nexusrpg.world.OreWorldGenerator;
 import com.nexusrpg.world.structures.NexusStructureGenerator;
 import net.minecraft.item.ItemStack;
@@ -29,6 +31,8 @@ public class NexusRpg {
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         logger = event.getModLog();
+        NexusCreativeTab.init();
+        CompassNetwork.init();
         GameRegistry.registerWorldGenerator(new OreWorldGenerator(), 0);
         GameRegistry.registerWorldGenerator(new NexusStructureGenerator(), 1);
         logger.info("Nexus RPG: preparando sistemas...");
@@ -40,6 +44,11 @@ public class NexusRpg {
         GameRegistry.addSmelting(ModBlocks.ADAMANTITE_ORE, new ItemStack(ModItems.ADAMANTITE_INGOT), 1.0F);
         GameRegistry.addSmelting(ModBlocks.DRACONITE_ORE, new ItemStack(ModItems.DRACONITE_INGOT), 1.5F);
         logger.info("Nexus RPG: inicializando...");
+    }
+
+    @Mod.EventHandler
+    public void serverStopping(net.minecraftforge.fml.common.event.FMLServerStoppingEvent event) {
+        CompassNetwork.clearJobs();
     }
 
     @Mod.EventHandler
