@@ -28,6 +28,12 @@ public final class BlockEnergyCable extends Block {
         setDefaultState(state);
     }
     @Override protected BlockStateContainer createBlockState() { return new BlockStateContainer(this, DOWN, UP, NORTH, SOUTH, WEST, EAST); }
+
+    // Connections are calculated from neighboring energy capabilities and do not need metadata.
+    // All 64 visual states share the same stored block state, including during harvest setup.
+    @Override public int getMetaFromState(IBlockState state) { return 0; }
+    @Override public IBlockState getStateFromMeta(int meta) { return getDefaultState(); }
+
     @Override public IBlockState getActualState(IBlockState state, IBlockAccess world, BlockPos pos) {
         for (EnumFacing side : EnumFacing.VALUES) {
             BlockPos neighbor = pos.offset(side);
