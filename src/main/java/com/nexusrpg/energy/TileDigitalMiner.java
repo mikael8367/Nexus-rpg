@@ -39,8 +39,8 @@ import net.minecraftforge.oredict.OreDictionary;
  * mines at most one ore for 200 FE. Unloaded positions are revisited on wrap.
  * Full output pauses at the same ore, without spending FE. Receives up to 1000 FE per call,
  * holds 100000 FE, never outputs FE. Output is extract-only on every face.
- * Right-click retrieves one stack (or the part that fits); breaking the miner
- * drops its contents. No Silk Touch or Fortune; Forge harvest drops apply.
+ * Right-click opens the output inventory; sneak-right-click retrieves one stack
+ * (or the part that fits). Breaking the miner drops its contents. No Silk Touch or Fortune; Forge harvest drops apply.
  * The placing player is represented by a Forge FakePlayer for break events;
  * machines without a player owner do not mine. Protection plugins must support
  * Forge fake-player break events; uncooperative claim systems are not guaranteed.
@@ -76,6 +76,10 @@ public class TileDigitalMiner extends TileEntity implements ITickable {
         @Override public boolean canExtract() { return false; }
         @Override public boolean canReceive() { return true; }
     };
+
+    int guiEnergy() { return energy; }
+    ItemStackHandler guiInventory() { return inventory; }
+    boolean isProcessing() { return processing; }
 
     public void setOwner(EntityPlayer player) {
         GameProfile profile = player.getGameProfile();
