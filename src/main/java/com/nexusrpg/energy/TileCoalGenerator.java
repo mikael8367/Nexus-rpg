@@ -18,6 +18,7 @@ public final class TileCoalGenerator extends TileProducer {
         }
         @Override public boolean isItemValid(int slot, ItemStack stack) { return isFuel(stack); }
     };
+    public int getBurnTicks() { return burnTicks; }
     public boolean isFuel(ItemStack stack) { return !stack.isEmpty() && stack.getItem() == Items.COAL && (stack.getMetadata() == 0 || stack.getMetadata() == 1); }
     @Override public void update() {
         if (world == null || world.isRemote) return;
