@@ -1,0 +1,93 @@
+name: Build Nexus RPG
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Set up Gradle 4.9
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '4.9'
+          cache-provider: basic
+
+      # ForgeGradle 3 finalizes jar with reobfJar; request it explicitly too.
+      - name: Build and reobfuscate
+        run: gradle build reobfJar --no-daemon --stacktrace
+
+      # Never upload a sources or development jar by accident. Also verify
+      # that processResources decoded every tracked PNG into the final jar.
+      - name: Verify mod jar
+        id: jar
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64
+          import os
+          import pathlib
+          import zipfile
+
+          props = {}
+          for line in pathlib.Path('gradle.properties').read_text(encoding='utf-8').splitlines():
+              line = line.strip()
+              if line and not line.startswith(('#', '!')) and '=' in line:
+                  key, value = line.split('=', 1)
+                  props[key.strip()] = value.strip()
+          version = props.get('mod_version', '')
+          if not version or any(c in version for c in '/\\\r\n'):
+              raise SystemExit('Invalid mod_version in gradle.properties')
+          jar = pathlib.Path('build/libs') / ('NexusRPG-' + version + '.jar')
+          if not jar.is_file():
+              raise SystemExit('Expected mod jar is missing: ' + str(jar))
+          resource_root = pathlib.Path('src/main/resources')
+          textures = list(resource_root.rglob('*.png.b64'))
+          if not textures:
+              raise SystemExit('No encoded textures found')
+          with zipfile.ZipFile(jar) as archive:
+              bad = archive.testzip()
+              if bad:
+                  raise SystemExit('Corrupt jar entry: ' + bad)
+              names = archive.namelist()
+              if len(names) != len(set(names)):
+                  raise SystemExit('Jar contains duplicate entries')
+              if 'com/nexusrpg/NexusRpg.class' not in names or 'mcmod.info' not in names:
+                  raise SystemExit('Mod class or metadata missing')
+              if any(name.endswith('.png.b64') for name in names):
+                  raise SystemExit('Encoded textures were included in the jar')
+              for source in textures:
+                  name = source.relative_to(resource_root).as_posix()[:-4]
+                  encoded = b''.join(source.read_bytes().split())
+                  expected = base64.b64decode(encoded, validate=True)
+                  if not expected.startswith(b'\x89PNG\r\n\x1a\n') or archive.read(name) != expected:
+                      raise SystemExit('Invalid or mismatched texture: ' + name)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('path=' + str(jar) + '\n')
+          print('Validated', jar, 'and', len(textures), 'textures')
+          PY
+
+      - name: Upload reobfuscated mod jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexusRPG-Forge-1.12.2
+          path: ${{ steps.jar.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
