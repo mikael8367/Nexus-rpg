@@ -3,6 +3,7 @@ package com.nexusrpg;
 import com.nexusrpg.init.ModBlocks;
 import com.nexusrpg.init.ModItems;
 import com.nexusrpg.world.OreWorldGenerator;
+import com.nexusrpg.world.structures.NexusStructureGenerator;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.registry.GameRegistry;
@@ -29,6 +30,7 @@ public class NexusRpg {
     public void preInit(FMLPreInitializationEvent event) {
         logger = event.getModLog();
         GameRegistry.registerWorldGenerator(new OreWorldGenerator(), 0);
+        GameRegistry.registerWorldGenerator(new NexusStructureGenerator(), 1);
         logger.info("Nexus RPG: preparando sistemas...");
     }
 
