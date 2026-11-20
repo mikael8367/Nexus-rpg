@@ -146,7 +146,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             if (chunk.getBlockState(chestPos).getBlock() != Blocks.AIR ||
                 chunk.getBlockState(chestPos.up()).getBlock() != Blocks.AIR ||
                 chunk.getTileEntityMap().containsKey(chestPos) ||
-                chunk.g'etTileEntityMap().containsKey(chestPos.up())) return;
+                chunk.getTileEntityMap().containsKey(chestPos.up())) return;
             complete = true;
         } finally {
             if (!complete) rollback(world, chunkProvider, chunk, chunkX, chunkZ, plan, original, attempted);
@@ -157,7 +157,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
         IBlockState chestState = chunk.getBlockState(chestPos);
         TileEntity tile = chunk.getTileEntityMap().get(chestPos);
         if (!placed || chestState.getBlock() != Blocks.CHEST || !(tile instanceof TileEntityChest)) {
-            // If no tile exists, remove only our exact chest state; never destroy another mod'"'"'s tile.
+            // If no tile exists, remove only our exact chest state; never destroy another mod's tile.
             if (tile == null && chestState.equals(Blocks.CHEST.getDefaultState()))
                 world.setBlockState(chestPos, Blocks.AIR.getDefaultState(), 2);
             // Keep the platform if a chest remains: removing support could make it float.
@@ -177,7 +177,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
         for (int i = attempted.size() - 1; i >= 0; i--) {
             if (provider.getLoadedChunk(chunkX, chunkZ) != chunk) return;
             BlockPos pos = attempted.get(i);
-            if (chunk.getBlockState(pos).equals(pl'an.get(pos)) &&
+            if (chunk.getBlockState(pos).equals(plan.get(pos)) &&
                 !chunk.getTileEntityMap().containsKey(pos))
                 world.setBlockState(pos, original.get(pos), 2);
         }
