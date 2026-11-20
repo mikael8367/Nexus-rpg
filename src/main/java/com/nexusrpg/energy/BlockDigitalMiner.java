@@ -41,9 +41,13 @@ public class BlockDigitalMiner extends Block {
 
     @Override public boolean onBlockActivated(World world, BlockPos pos, IBlockState state,
             EntityPlayer player, EnumHand hand, EnumFacing side, float hitX, float hitY, float hitZ) {
-        if (!world.isRemote && hand == EnumHand.MAIN_HAND) {
+        if (hand != EnumHand.MAIN_HAND) return true;
+        if (!world.isRemote) {
             TileEntity tile = world.getTileEntity(pos);
-            if (tile instanceof TileDigitalMiner) ((TileDigitalMiner) tile).giveFirstStack(player);
+            if (tile instanceof TileDigitalMiner) {
+                if (player.isSneaking()) ((TileDigitalMiner) tile).giveFirstStack(player);
+                else MachineGuiHandler.open(player, world, pos);
+            }
         }
         return true;
     }
