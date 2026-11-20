@@ -28,6 +28,7 @@ public abstract class TileProducer extends TileEntity implements ITickable {
         public boolean canExtract() { return !emitting; }
         public boolean canReceive() { return false; }
     };
+    int guiEnergy() { return energy; }
     protected void addEnergy(int amount) { energy = Math.min(CAPACITY, energy + amount); markDirty(); }
     protected void emit(int max) {
         if (emitting || world == null || world.isRemote || isInvalid()) return;

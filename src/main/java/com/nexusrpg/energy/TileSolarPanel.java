@@ -27,7 +27,7 @@ public final class TileSolarPanel extends TileProducer {
     private boolean controller() { return origin != null && origin.equals(pos) && structure != null; }
 
     /** Do not load chunks and do not generate or expose stored energy for a damaged panel. */
-    private boolean complete() {
+    boolean complete() {
         if (world == null || origin == null || structure == null) return false;
         for (int x = -1; x <= 1; x++) for (int z = -1; z <= 1; z++) {
             BlockPos p = origin.add(x, 0, z);
