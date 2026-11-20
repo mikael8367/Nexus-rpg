@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "III",
+    "I I",
+    "I I"
+  ],
+  "key": {
+    "I": {
+      "item": "nexusrpg:draconite_ingot"
+    }
+  },
+  "result": {
+    "item": "nexusrpg:draconite_leggings"
+  }
+}
