@@ -1,0 +1,12 @@
+[
+  {
+    "modid": "nexusrpg",
+    "name": "Nexus RPG",
+    "description": "Explore estruturas antigas, enfrente bosses e descubra equipamentos lendarios.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "authorList": ["Nexus RPG Team"],
+    "credits": "Nexus RPG Team",
+    "dependencies": []
+  }
+]
