@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "nexusrpg:blocks/solar_panel_large_side",
+    "down": "nexusrpg:blocks/solar_panel_large_side",
+    "up": "nexusrpg:blocks/solar_panel_large_top",
+    "north": "nexusrpg:blocks/solar_panel_large_side",
+    "south": "nexusrpg:blocks/solar_panel_large_side",
+    "west": "nexusrpg:blocks/solar_panel_large_side",
+    "east": "nexusrpg:blocks/solar_panel_large_side"
+  }
+}
