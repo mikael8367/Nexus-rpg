@@ -1,5 +1,6 @@
 package com.nexusrpg.init;
 
+import java.util.List;
 import java.util.Random;
 import net.minecraft.init.Blocks;
 import net.minecraft.util.math.BlockPos;
@@ -12,12 +13,18 @@ import net.minecraftforge.common.BiomeManager;
 import net.minecraftforge.common.BiomeManager.BiomeEntry;
 import net.minecraftforge.common.BiomeManager.BiomeType;
 import net.minecraftforge.event.RegistryEvent;
+import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.registry.ForgeRegistries;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /** Biomas próprios: registro, distribuição natural e decoração vanilla apropriada. */
 @Mod.EventBusSubscriber(modid = "nexusrpg")
 public final class ModBiomes {
+    private static final Logger LOGGER = LogManager.getLogger("Nexus RPG Biomes");
+
     // 1.12 rejects temperatures strictly between 0.1 and 0.2 at construction.
     public static final Biome ENCHANTED_GROVE = create("enchanted_grove", "Bosque das Runas", 0.25F, 0.85F, 0.20F, 0.12F, 0x36B86A);
     public static final Biome FROST_CROWN = create("frost_crown", "Coroa Boreal", -0.35F, 0.25F, 0.05F, 0.08F, 0x75D9E8);
@@ -56,6 +63,47 @@ public final class ModBiomes {
         add(ROSA_SANCTUM, BiomeType.COOL, Type.FOREST, Type.MAGICAL, Type.LUSH);
         add(UMBRAL_REACH, BiomeType.WARM, Type.DRY, Type.WASTELAND, Type.SPOOKY, Type.SPARSE);
         add(TITAN_CANOPY, BiomeType.WARM, Type.FOREST, Type.DENSE, Type.HILLS);
+        LOGGER.info("Oito biomas Nexus registrados e adicionados ao BiomeManager.");
+    }
+
+    /** Somente diagnostico: nao consulta nem carrega chunks e nao altera a geracao. */
+    @SubscribeEvent
+    public static void reportOverworldBiomes(WorldEvent.Load event) {
+        if (event.getWorld().isRemote || event.getWorld().provider.getDimension() != 0) return;
+        LOGGER.info("Diagnostico dos biomas Nexus no Overworld; biome provider: {}",
+            event.getWorld().getBiomeProvider().getClass().getName());
+        report(ENCHANTED_GROVE, BiomeType.COOL);
+        report(FROST_CROWN, BiomeType.ICY);
+        report(SUNKEN_EMPIRE, BiomeType.DESERT);
+        report(WITCHING_MIRE, BiomeType.WARM);
+        report(CINDER_HEART, BiomeType.DESERT);
+        report(ROSA_SANCTUM, BiomeType.COOL);
+        report(UMBRAL_REACH, BiomeType.WARM);
+        report(TITAN_CANOPY, BiomeType.WARM);
+    }
+
+    private static void report(Biome biome, BiomeType climate) {
+        boolean registered = ForgeRegistries.BIOMES.getValue(biome.getRegistryName()) == biome;
+        int entries = 0;
+        int weight = 0;
+        List<BiomeEntry> biomes = BiomeManager.getBiomes(climate);
+        if (biomes != null) {
+            for (BiomeEntry entry : biomes) {
+                if (entry.biome == biome) {
+                    entries++;
+                    weight += entry.itemWeight;
+                }
+            }
+        }
+        boolean hasTypes = registered && BiomeDictionary.hasAnyType(biome);
+        if (!registered || entries == 0 || weight <= 0 || !hasTypes) {
+            LOGGER.warn("{} registro={} clima={} entradas={} peso={} temTipos={}",
+                biome.getRegistryName(), registered, climate, entries, weight, hasTypes);
+        } else {
+            LOGGER.info("{} registro={} id={} clima={} entradas={} peso={} tipos={}",
+                biome.getRegistryName(), true, Biome.getIdForBiome(biome), climate, entries,
+                weight, BiomeDictionary.getTypes(biome));
+        }
     }
 
     private static void add(Biome biome, BiomeType climate, Type... types) {
