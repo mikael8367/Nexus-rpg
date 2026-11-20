@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "nexusrpg:blocks/digital_miner_side",
+    "down": "nexusrpg:blocks/digital_miner_side",
+    "up": "nexusrpg:blocks/digital_miner_top",
+    "north": "nexusrpg:blocks/digital_miner_front",
+    "south": "nexusrpg:blocks/digital_miner_side",
+    "west": "nexusrpg:blocks/digital_miner_side",
+    "east": "nexusrpg:blocks/digital_miner_side"
+  }
+}
