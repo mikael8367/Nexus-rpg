@@ -1,6 +1,7 @@
 package com.nexusrpg.init;
 
 import com.nexusrpg.armor.GearArmor;
+import com.nexusrpg.compass.ItemBiomeCompass;
 import com.nexusrpg.weapons.GearAxe;
 import com.nexusrpg.weapons.GearHoe;
 import java.util.ArrayList;
@@ -37,6 +38,8 @@ public final class ModItems {
     public static final Item ADAMANTITE_INGOT = item("adamantite_ingot", CreativeTabs.MATERIALS);
     public static final Item DRACONITE_INGOT = item("draconite_ingot", CreativeTabs.MATERIALS);
 
+    public static final Item BIOME_COMPASS = named(new ItemBiomeCompass(), "biome_compass", CreativeTabs.TOOLS);
+
     private static final List<Item> ALL_ITEMS = buildItems();
 
     private ModItems() {}
@@ -59,7 +62,7 @@ public final class ModItems {
         List<Item> items = new ArrayList<>();
         Collections.addAll(items, KEY_GREEN, KEY_CYAN, KEY_YELLOW, KEY_PURPLE,
             KEY_RED, KEY_PINK, KEY_BLACK, KEY_ORANGE,
-            MITHRIL_INGOT, ADAMANTITE_INGOT, DRACONITE_INGOT);
+            MITHRIL_INGOT, ADAMANTITE_INGOT, DRACONITE_INGOT, BIOME_COMPASS);
         addTier(items, "mithril", MITHRIL_INGOT, 3, 1900, 9.0F, 3.5F, 18,
             36, new int[] {3, 6, 8, 3}, 2.0F);
         addTier(items, "adamantite", ADAMANTITE_INGOT, 4, 2500, 11.0F, 4.5F, 20,
