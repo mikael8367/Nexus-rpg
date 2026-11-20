@@ -17,7 +17,15 @@ Os biomas são registrados como biomas próprios do mod, com parâmetros de clim
 
 Os oito biomas são adicionados às listas climáticas do Forge para geração natural no Overworld, com peso 4 por bioma, sem remover os biomas existentes. Recebem também tipos do Biome Dictionary para compatibilidade. A disponibilidade depende do gerador de mundo: tipos personalizados, mundos de bioma único e a opção vanilla antiga podem ignorar parte dessas listas. A distribuição afeta novos chunks; chunks já gerados não são recriados automaticamente.
 
+O peso 4 é relativo às entradas do mesmo clima, não uma chance de 4% por chunk. No Forge 1.12.2, o sorteio é feito pelas camadas do gerador e passa por outras transformações, como rios e bordas; a distância até um bioma varia com a semente. Adicionar entradas ao BiomeManager marca as listas como modificadas, portanto o Forge considera pesos que não são múltiplos de 10. O modo de mundo antigo (`DEFAULT_1_1`) substitui a lista desértica do Forge; os dois biomas Nexus desse clima podem não aparecer nele.
+
 A aparência usa relevo e cores, neve na Coroa Boreal, areia no Império Soterrado, terreno pedregoso nos ermos e decoração com blocos e árvores vanilla. Os biomas não têm blocos ou vegetação exclusivos por enquanto.
+
+## Como procurar e diagnosticar
+
+Use um mundo novo de tipo **Padrão**, com o Forge e o mod instalados. Em um mundo anterior, explore território ainda não gerado; os chunks antigos mantêm seus biomas. Na edição Java 1.12.2 não existe o comando vanilla `/locatebiome`. Uma opção é instalar [Nature's Compass para Forge 1.12.2](https://www.curseforge.com/minecraft/mc-mods/natures-compass/files/2893527), escolher o bioma Nexus e pesquisar as coordenadas. Uma busca sem resultado não prova que o bioma não existe: considere o alcance configurado, o tipo do mundo e a semente.
+
+Ao carregar o Overworld no servidor, o Nexus registra no log o provedor de biomas e, para cada bioma, sua presença no registro, clima, quantidade de entradas e peso atual no BiomeManager, além do ID e tipos quando disponíveis. Avisos apontam registro, entrada, peso ou tipos ausentes. Isso não verifica chunks e não garante que um gerador personalizado respeite as listas. Os dados refletem o momento do carregamento; outro mod pode alterá-los. Não executa busca de chunks nem os modifica. Os logs ajudam a diagnosticar, mas não substituem um teste no jogo.
 
 ## Estruturas e saques
 
