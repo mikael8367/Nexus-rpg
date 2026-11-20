@@ -102,12 +102,28 @@ public final class BlockPowerMachine extends Block {
         }
     }
     @Override public boolean onBlockActivated(World world, BlockPos pos, IBlockState state, EntityPlayer player, EnumHand hand, EnumFacing facing, float x, float y, float z) {
-        if (solar || !(world.getTileEntity(pos) instanceof TileCoalGenerator)) return false;
-        ItemStack held = player.getHeldItem(hand);
-        if (held.isEmpty()) return false;
-        TileCoalGenerator tile = (TileCoalGenerator) world.getTileEntity(pos);
-        if (!tile.isFuel(held)) return false;
-        if (!world.isRemote) player.setHeldItem(hand, tile.inventory.insertItem(0, held, false));
+        if (hand != EnumHand.MAIN_HAND) return false;
+        TileEntity tile = world.getTileEntity(pos);
+        if (!(tile instanceof TileCoalGenerator) && !(tile instanceof TileSolarPanel)) return false;
+        if (!world.isRemote) {
+            // Before the GUI existed vanilla retried the interaction with the
+            // off hand when the main hand was not fuel; preserve that shortcut.
+            EnumHand fuelHand = hand;
+            if (tile instanceof TileCoalGenerator && !((TileCoalGenerator) tile).isFuel(player.getHeldItem(hand))
+                    && ((TileCoalGenerator) tile).isFuel(player.getHeldItemOffhand())) fuelHand = EnumHand.OFF_HAND;
+            ItemStack held = player.getHeldItem(fuelHand);
+            if (tile instanceof TileCoalGenerator && ((TileCoalGenerator) tile).isFuel(held)) {
+                player.setHeldItem(fuelHand, ((TileCoalGenerator) tile).inventory.insertItem(0, held, false));
+            } else if (tile instanceof TileSolarPanel) {
+                TileSolarPanel part = (TileSolarPanel) tile;
+                BlockPos origin = part.origin();
+                if (origin != null && part.structure() != null && world.isBlockLoaded(origin)) {
+                    TileEntity controller = world.getTileEntity(origin);
+                    if (controller instanceof TileSolarPanel && ((TileSolarPanel) controller).belongsTo(origin, part.structure()))
+                        MachineGuiHandler.open(player, world, origin);
+                }
+            } else MachineGuiHandler.open(player, world, pos);
+        }
         return true;
     }
     @Override public boolean removedByPlayer(IBlockState state, World world, BlockPos pos, EntityPlayer player, boolean willHarvest) {

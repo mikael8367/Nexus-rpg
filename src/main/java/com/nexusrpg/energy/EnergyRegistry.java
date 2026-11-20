@@ -21,6 +21,9 @@ public final class EnergyRegistry {
     @SubscribeEvent
     public static void blocks(RegistryEvent.Register<Block> event) {
         event.getRegistry().registerAll(SOLAR_PANEL, COAL_GENERATOR, CABLE, MINER);
+        net.minecraftforge.fml.common.network.NetworkRegistry.INSTANCE.registerGuiHandler(
+            net.minecraftforge.fml.common.Loader.instance().getIndexedModList().get(NexusRpg.MODID).getMod(),
+            new MachineGuiHandler());
         GameRegistry.registerTileEntity(TileSolarPanel.class, new ResourceLocation(NexusRpg.MODID, "solar_panel_large"));
         GameRegistry.registerTileEntity(TileCoalGenerator.class, new ResourceLocation(NexusRpg.MODID, "coal_generator"));
         GameRegistry.registerTileEntity(TileEnergyCable.class, new ResourceLocation(NexusRpg.MODID, "energy_cable"));
