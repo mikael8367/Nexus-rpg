@@ -1,6 +1,11 @@
 package com.nexusrpg;
 
+import com.nexusrpg.init.ModBlocks;
+import com.nexusrpg.init.ModItems;
+import com.nexusrpg.world.OreWorldGenerator;
+import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.registry.GameRegistry;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
@@ -23,11 +28,15 @@ public class NexusRpg {
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         logger = event.getModLog();
+        GameRegistry.registerWorldGenerator(new OreWorldGenerator(), 0);
         logger.info("Nexus RPG: preparando sistemas...");
     }
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
+        GameRegistry.addSmelting(ModBlocks.MITHRIL_ORE, new ItemStack(ModItems.MITHRIL_INGOT), 0.7F);
+        GameRegistry.addSmelting(ModBlocks.ADAMANTITE_ORE, new ItemStack(ModItems.ADAMANTITE_INGOT), 1.0F);
+        GameRegistry.addSmelting(ModBlocks.DRACONITE_ORE, new ItemStack(ModItems.DRACONITE_INGOT), 1.5F);
         logger.info("Nexus RPG: inicializando...");
     }
 

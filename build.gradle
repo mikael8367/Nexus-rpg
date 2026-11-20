@@ -28,15 +28,29 @@ processResources {
     inputs.property 'version', project.version
     inputs.property 'mcversion', '1.12.2'
 
-    from(sourceSets.main.resources.srcDirs) {
-        include 'mcmod.info'
-        expand(
-            version: project.version,
-            mcversion: '1.12.2'
-        )
+    // Keep the Java plugin's single resource source; only mcmod.info is expanded.
+    filesMatching('mcmod.info') {
+        expand(version: project.version, mcversion: '1.12.2')
     }
 
-    from(sourceSets.main.resources.srcDirs) {
-        exclude 'mcmod.info'
+    // PNGs are stored as text for GitHub integration. Track these separately as
+    // inputs because the Copy task must not copy the encoded files to the JAR.
+    def encodedTextures = files(sourceSets.main.resources.srcDirs.collect { dir ->
+        fileTree(dir: dir, include: '**/*.png.b64')
+    })
+    inputs.files(encodedTextures)
+    exclude '**/*.png.b64'
+    doLast {
+        sourceSets.main.resources.srcDirs.each { dir ->
+            fileTree(dir: dir, include: '**/*.png.b64').each { encoded ->
+                def relative = dir.toPath().relativize(encoded.toPath()).toString()
+                def output = new File(destinationDir, relative.substring(0, relative.length() - 4))
+                if (new File(dir, relative.substring(0, relative.length() - 4)).exists()) {
+                    throw new GradleException("Both PNG and encoded PNG exist: ${relative}")
+                }
+                output.parentFile.mkdirs()
+                output.bytes = java.util.Base64.getDecoder().decode(encoded.getText('UTF-8').replaceAll('\\s', ''))
+            }
+        }
     }
 }
