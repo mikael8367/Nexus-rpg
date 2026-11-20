@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "III",
+    "I I"
+  ],
+  "key": {
+    "I": {
+      "item": "nexusrpg:mithril_ingot"
+    }
+  },
+  "result": {
+    "item": "nexusrpg:mithril_helmet"
+  }
+}
