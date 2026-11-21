@@ -12,7 +12,9 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.Blocks;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -27,6 +29,10 @@ import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.items.ItemStackHandler;
 
 public final class BlockPowerMachine extends Block {
+    // Not an ItemBlock: the payload is never automatically applied to a tile.
+    public static final Item COAL_RECOVERY = new Item().setMaxStackSize(1)
+        .setRegistryName(NexusRpg.MODID, "coal_recovery")
+        .setUnlocalizedName(NexusRpg.MODID + ".coal_recovery");
     private final boolean solar;
     private static final ThreadLocal<Boolean> SOLAR_CLEANUP = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> SOLAR_CREATIVE = ThreadLocal.withInitial(() -> false);
@@ -127,7 +133,12 @@ public final class BlockPowerMachine extends Block {
         return true;
     }
     @Override public boolean removedByPlayer(IBlockState state, World world, BlockPos pos, EntityPlayer player, boolean willHarvest) {
-        if (!solar) return super.removedByPlayer(state, world, pos, player, willHarvest);
+        if (!solar) {
+            if (world.captureBlockSnapshots || world.restoringBlockSnapshots) return false;
+            TileEntity tile = world.getTileEntity(pos);
+            if (tile instanceof TileCoalGenerator && ((TileCoalGenerator) tile).hasOpaqueRecoveryData()) return false;
+            return super.removedByPlayer(state, world, pos, player, willHarvest);
+        }
         if (!world.isRemote) {
             if (!(player instanceof EntityPlayerMP)) return false;
             TileEntity tile = world.getTileEntity(pos);
@@ -152,17 +163,40 @@ public final class BlockPowerMachine extends Block {
     }
     @Override public void onBlockExploded(World world, BlockPos pos, Explosion explosion) {
         // Do not bypass explosion protections on the other eight cells.
-        if (!solar) super.onBlockExploded(world, pos, explosion);
+        if (!solar) {
+            if (world.captureBlockSnapshots || world.restoringBlockSnapshots) return;
+            TileEntity tile = world.getTileEntity(pos);
+            if (tile instanceof TileCoalGenerator && ((TileCoalGenerator) tile).hasOpaqueRecoveryData()) return;
+            super.onBlockExploded(world, pos, explosion);
+        }
     }
     @Override public void getDrops(NonNullList<ItemStack> drops, IBlockAccess world, BlockPos pos, IBlockState state, int fortune) {
-        if (!solar) super.getDrops(drops, world, pos, state, fortune);
+        if (!solar) {
+            if (world instanceof World && (((World) world).captureBlockSnapshots || ((World) world).restoringBlockSnapshots)) return;
+            // Explosion.doExplosionB asks for drops before onBlockExploded.
+            // If destruction is refused, emitting a block here duplicates it.
+            TileEntity tile = world.getTileEntity(pos);
+            if (tile instanceof TileCoalGenerator && ((TileCoalGenerator) tile).hasOpaqueRecoveryData()) return;
+            super.getDrops(drops, world, pos, state, fortune);
+        }
     }
     @Override public void breakBlock(World world, BlockPos pos, IBlockState state) {
         TileEntity tile = world.getTileEntity(pos);
-        if (!world.isRemote && tile instanceof TileCoalGenerator) {
-            ItemStackHandler inv = ((TileCoalGenerator) tile).inventory;
-            ItemStack stack = inv.extractItem(0, 64, false);
-            if (!stack.isEmpty()) spawnAsEntity(world, pos, stack);
+        if (!world.isRemote && !world.captureBlockSnapshots && !world.restoringBlockSnapshots && tile instanceof TileCoalGenerator) {
+            TileCoalGenerator coal = (TileCoalGenerator) tile;
+            if (coal.hasOpaqueRecoveryData()) {
+                // No BlockEntityTag, automatic restoration, or separate active inventory
+                // drop: an opaque archive may already contain that same inventory.
+                ItemStack recovery = new ItemStack(COAL_RECOVERY);
+                NBTTagCompound payload = new NBTTagCompound();
+                payload.setTag("NexusRpgCoalRecovery", coal.writeToNBT(new NBTTagCompound()));
+                recovery.setTagCompound(payload);
+                spawnAsEntity(world, pos, recovery);
+            } else {
+                ItemStackHandler inv = coal.inventory;
+                ItemStack stack = inv.extractItem(0, 64, false);
+                if (!stack.isEmpty()) spawnAsEntity(world, pos, stack);
+            }
         }
         if (solar && !world.isRemote && !world.restoringBlockSnapshots && !SOLAR_CLEANUP.get()) {
             TileSolarPanel solarTile = tile instanceof TileSolarPanel ? (TileSolarPanel) tile : null;
