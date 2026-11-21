@@ -13,7 +13,12 @@ public final class RealLootChecks {
         check(manager, "basalt_guardian", "basalt_common", "basalt_extra");
         check(manager, "reed_stilt", "reed_stilt_common", "reed_stilt_extra");
         check(manager, "prism_tortoise", "prism_tortoise_common", "prism_tortoise_extra");
-        System.out.println("PASS: real loot table loader found all ten pools");
+        check(manager, "lumen_moth", "lumen_moth_common", "lumen_moth_extra");
+        check(manager, "dune_mole", "dune_mole_common", "dune_mole_extra");
+        check(manager, "bellback", "bellback_common", "bellback_extra");
+        check(manager, "dune_burrower", "dune_burrower_common", "dune_burrower_extra");
+        check(manager, "root_warden", "root_warden_common", "root_warden_extra");
+        System.out.println("PASS: real loot table loader found all twenty pools");
     }
     private static void check(LootTableManager m, String id, String first, String second) {
         LootTable t = m.getLootTableFromLocation(new ResourceLocation("nexusrpg", "entities/" + id));

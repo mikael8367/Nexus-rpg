@@ -17,5 +17,10 @@ public final class MobClientRegistration {
         RenderingRegistry.registerEntityRenderingHandler(EntityBasalt.class, m -> new MobRenderer<EntityBasalt>(m, new ModelBasalt(), "basalt_guardian"));
         RenderingRegistry.registerEntityRenderingHandler(EntityStilt.class, m -> new MobRenderer<EntityStilt>(m, new ModelStilt(), "reed_stilt"));
         RenderingRegistry.registerEntityRenderingHandler(EntityPrism.class, m -> new MobRenderer<EntityPrism>(m, new ModelPrism(), "prism_tortoise"));
+        RenderingRegistry.registerEntityRenderingHandler(EntityLumenMoth.class, m -> new MobRenderer<EntityLumenMoth>(m, new ModelLumenMoth(), "lumen_moth"));
+        RenderingRegistry.registerEntityRenderingHandler(EntityDuneMole.class, m -> new MobRenderer<EntityDuneMole>(m, new ModelDuneMole(), "dune_mole"));
+        RenderingRegistry.registerEntityRenderingHandler(EntityBellback.class, m -> new MobRenderer<EntityBellback>(m, new ModelBellback(), "bellback"));
+        RenderingRegistry.registerEntityRenderingHandler(EntityBurrower.class, m -> new MobRenderer<EntityBurrower>(m, new ModelBurrower(), "dune_burrower"));
+        RenderingRegistry.registerEntityRenderingHandler(EntityRootwarden.class, m -> new MobRenderer<EntityRootwarden>(m, new ModelRootwarden(), "root_warden"));
     }
 }

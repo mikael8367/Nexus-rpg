@@ -49,17 +49,18 @@ public final class NexusCreativeTab {
                 // Preserve a default for items which suppress all their variants.
                 if (items.size() == previousSize) items.add(new ItemStack(item));
             }
-            addDragonEggs(items);
+            addCreatureEggs(items);
         }
     };
 
     private NexusCreativeTab() {}
 
-    /** Add the vanilla spawn-egg variants without reassigning the vanilla item. */
-    private static void addDragonEggs(NonNullList<ItemStack> items) {
-        String[] dragons = {"fire_dragon", "water_dragon", "wind_dragon", "earth_dragon"};
-        for (String dragon : dragons) {
-            ResourceLocation id = new ResourceLocation(NexusRpg.MODID, dragon);
+    /** Add registered vanilla spawn-egg variants without reassigning the vanilla item. */
+    private static void addCreatureEggs(NonNullList<ItemStack> items) {
+        String[] creatures = {"fire_dragon", "water_dragon", "wind_dragon", "earth_dragon",
+                "bramble_hound", "cavern_crawler", "basalt_guardian", "reed_stilt", "prism_tortoise", "lumen_moth", "dune_mole", "bellback", "dune_burrower", "root_warden"};
+        for (String creature : creatures) {
+            ResourceLocation id = new ResourceLocation(NexusRpg.MODID, creature);
             if (!EntityList.ENTITY_EGGS.containsKey(id)) continue;
             boolean present = false;
             for (ItemStack stack : items) {

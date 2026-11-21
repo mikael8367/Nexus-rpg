@@ -130,3 +130,12 @@ entity.cavern_crawler.name=Cavern Crawler
 entity.basalt_guardian.name=Basalt Guardian
 entity.reed_stilt.name=Reed Stilt
 entity.prism_tortoise.name=Prism Tortoise
+
+entity.lumen_moth.name=Lumen Moth
+
+entity.dune_mole.name=Dune Mole
+
+entity.bellback.name=Bellback
+
+entity.dune_burrower.name=Dune Burrower
+entity.root_warden.name=Root Warden

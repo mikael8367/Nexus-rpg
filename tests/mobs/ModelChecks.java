@@ -10,7 +10,12 @@ public final class ModelChecks {
         check(new ModelBasalt(), null, 0);
         check(new ModelStilt(), "legs", 2);
         check(new ModelPrism(), "legs", 4);
-        System.out.println("PASS: five real ModelBase constructors, UV bounds and walk animation");
+        check(new ModelLumenMoth(), "legs", 6);
+        check(new ModelDuneMole(), "legs", 4);
+        check(new ModelBellback(), "legs", 4);
+        check(new ModelBurrower(), "legs", 6);
+        check(new ModelRootwarden(), "legs", 2);
+        System.out.println("PASS: ten real ModelBase constructors, UV bounds and animation");
     }
     private static void check(ModelBase model, String legField, int legs) throws Exception {
         if (model.textureWidth != 64 || model.textureHeight != 64) throw new AssertionError("texture size");
@@ -28,6 +33,15 @@ public final class ModelChecks {
             }
         }
         if (boxes < 6) throw new AssertionError("missing anatomy");
+        if (model instanceof ModelLumenMoth || model instanceof ModelDuneMole || model instanceof ModelBellback) {
+            Field f = model.getClass().getDeclaredField(legField); f.setAccessible(true);
+            ModelRenderer[] parts = (ModelRenderer[]) f.get(model);
+            model.setRotationAngles(0F, 0F, 10F, 0F, 0F, .0625F, null);
+            for (ModelRenderer part : parts) if (Math.abs(part.rotateAngleX) > 0.00001F) throw new AssertionError("legs move while idle");
+            model.setRotationAngles(0F, .7F, 10F, 0F, 0F, .0625F, null);
+            if (Math.abs(parts[0].rotateAngleX) < 0.01F || Math.abs(parts[0].rotateAngleX - parts[1].rotateAngleX) < 0.01F)
+                throw new AssertionError("walk animation missing or unsynchronized");
+        }
         model.setRotationAngles(1F, .7F, 10F, 20F, 10F, .0625F, null);
         int moving=0;
         for (ModelRenderer part : model.boxList) {

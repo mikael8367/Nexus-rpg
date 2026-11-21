@@ -54,13 +54,24 @@ public class MobBehaviorChecks {
     check(p.added==0,"no extra effect when hit fails");
     Method m=mob.getClass().getDeclaredMethod("getLootTable"); m.setAccessible(true); check(m.invoke(mob).toString().equals("nexusrpg:entities/"+loot),"loot id");
   }
+  static void attributes(EntityNexusMob mob, double h, double speed, double damage) throws Exception {
+    String[] names={"health","speed","damage"}; double[] expected={h,speed,damage};
+    for(int i=0;i<names.length;i++) { Method method=mob.getClass().getDeclaredMethod(names[i]); method.setAccessible(true); check(((Double)method.invoke(mob)).doubleValue()==expected[i],names[i]); }
+    for(Method method:mob.getClass().getDeclaredMethods()) check(!method.getName().equals("attackEntityAsMob"),"must inherit ordinary attack");
+  }
   public static void main(String[] args) throws Exception {
+    attributes(new EntityLumenMoth(new World()),20,.30,3);
+    attributes(new EntityDuneMole(new World()),34,.24,5);
+    attributes(new EntityBellback(new World()),40,.19,4);
     run(new EntityBramble(new World()),MobEffects.SLOWNESS,40,"bramble_hound");
     run(new EntityCavern(new World()),MobEffects.WEAKNESS,60,"cavern_crawler");
     run(new EntityBasalt(new World()),MobEffects.MINING_FATIGUE,80,"basalt_guardian");
     run(new EntityStilt(new World()),MobEffects.SLOWNESS,40,"reed_stilt");
     run(new EntityPrism(new World()),MobEffects.SLOWNESS,40,"prism_tortoise");
-    System.out.println("PASS: ordinary attacks and five loot IDs on test doubles");
+    run(new EntityLumenMoth(new World()),MobEffects.SLOWNESS,40,"lumen_moth");
+    run(new EntityDuneMole(new World()),MobEffects.SLOWNESS,40,"dune_mole");
+    run(new EntityBellback(new World()),MobEffects.SLOWNESS,40,"bellback");
+    System.out.println("PASS: ordinary attacks and eight loot IDs on test doubles");
   }
 }'''
 for name, content in files.items():
@@ -68,10 +79,10 @@ for name, content in files.items():
 real = root/'src/main/java/com/nexusrpg/mobs'
 cmd=[str(java_home/'bin/javac'), '-source', '8', '-target', '8', '-d', str(classes)]
 cmd += [str(p) for p in src.rglob('*.java')]
-cmd += [str(real/name) for name in ('EntityNexusMob.java','EntityBramble.java','EntityCavern.java','EntityBasalt.java','EntityStilt.java','EntityPrism.java')]
+cmd += [str(real/name) for name in ('EntityNexusMob.java','EntityBramble.java','EntityCavern.java','EntityBasalt.java','EntityStilt.java','EntityPrism.java', 'EntityLumenMoth.java', 'EntityDuneMole.java', 'EntityBellback.java')]
 subprocess.run(cmd,check=True)
 subprocess.run([str(java_home/'bin/java'),'-cp',str(classes),'MobBehaviorChecks'],check=True)
-expected = {'bramble_hound':('string','wheat_seeds'), 'cavern_crawler':('flint','coal'), 'basalt_guardian':('cobblestone','iron_nugget'), 'reed_stilt':('feather','wheat_seeds'), 'prism_tortoise':('quartz','gold_nugget')}
+expected = {'bramble_hound':('string','wheat_seeds'), 'cavern_crawler':('flint','coal'), 'basalt_guardian':('cobblestone','iron_nugget'), 'reed_stilt':('feather','wheat_seeds'), 'prism_tortoise':('quartz','gold_nugget'), 'lumen_moth':('glowstone_dust','string'), 'dune_mole':('sand','flint'), 'bellback':('clay_ball','prismarine_shard')}
 for name, (common, extra) in expected.items():
     data=json.loads((root/'src/main/resources/assets/nexusrpg/loot_tables/entities'/f'{name}.json').read_text())
     pools=data['pools']; assert len(pools)==2
