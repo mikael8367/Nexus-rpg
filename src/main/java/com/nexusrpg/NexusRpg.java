@@ -33,6 +33,7 @@ public class NexusRpg {
         logger = event.getModLog();
         NexusCreativeTab.init();
         CompassNetwork.init();
+        com.nexusrpg.character.CharacterNetwork.init();
         GameRegistry.registerWorldGenerator(new OreWorldGenerator(), 0);
         GameRegistry.registerWorldGenerator(new NexusStructureGenerator(), 1);
         logger.info("Nexus RPG: preparando sistemas...");
