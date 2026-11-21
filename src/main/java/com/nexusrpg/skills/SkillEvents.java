@@ -3,6 +3,8 @@ package com.nexusrpg.skills;
 import com.nexusrpg.character.CharacterProfile;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.IEntityOwnable;
@@ -33,6 +35,23 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 public final class SkillEvents {
     private static final String KEY = "NexusRpgSkills";
     private static final String[] CLASSES = {"warrior", "mage", "archer", "assassin", "paladin", "necromancer"};
+    // Server-thread only. Failed casts otherwise allow a client to repeatedly scan
+    // loaded entities and flood chat without spending mana or starting a cooldown.
+    private static final OnePerTick<EntityPlayerMP> CAST_ATTEMPTS = new OnePerTick<>();
+    static final class OnePerTick<T> {
+        private final Map<T, Long> last = new WeakHashMap<>();
+        boolean admit(T key, long tick) {
+            if (key == null || tick < 0) return false;
+            Long previous = last.get(key);
+            if (previous != null && previous.longValue() == tick) return false;
+            last.put(key, tick);
+            return true;
+        }
+        void succeeded(T key, long tick) {
+            Long previous = last.get(key);
+            if (previous != null && previous.longValue() == tick) last.remove(key);
+        }
+    }
     private SkillEvents() {}
 
     static NBTTagCompound data(EntityPlayer p) {
@@ -153,6 +172,14 @@ public final class SkillEvents {
 
     // Entrada interna: somente chamada por SkillTreeService após checagem do servidor.
     static void activateServer(EntityPlayerMP p, boolean ultimate, boolean fire) {
+        long tick = now(p);
+        if (tick < 0 || tick > Long.MAX_VALUE - (ultimate ? 1200 : 160)) {
+            say(p, "Relógio do mundo inválido; nada foi alterado."); return;
+        }
+        // All cast variants share a per-player budget while a cast is pending or
+        // has failed. Successful casts release it so normal active/ultimate combos
+        // in the same tick remain possible. Suppressed duplicates are silent.
+        if (!CAST_ATTEMPTS.admit(p, tick)) return;
         String c=CharacterProfile.characterClass(p);
         if (fire && (ultimate || !"mage".equals(c))) { say(p, "O ataque de fogo é exclusivo do mago."); return; }
         NBTTagCompound d=data(p);
@@ -160,10 +187,6 @@ public final class SkillEvents {
         if (!SkillTreeService.runtimeValid(d)) { say(p, "Dados de habilidades incompatíveis; nada foi alterado."); return; }
         int level=CharacterProfile.level(p), r=rank(d,c);
         if (ultimate && level < 15) { say(p, "A suprema exige nivel 15."); return; }
-        long tick = now(p);
-        if (tick < 0 || tick > Long.MAX_VALUE - (ultimate ? 1200 : 160)) {
-            say(p, "Relógio do mundo inválido; nada foi alterado."); return;
-        }
         String timer = (ultimate ? "ultimate_" : "cast_") + c;
         long ready = d.getLong(timer);
         if (ready > tick) { say(p, "Recarga: " + SkillTreeService.secondsRemaining(ready, tick) + " s."); return; }
@@ -219,6 +242,7 @@ public final class SkillEvents {
             else if ("necromancer".equals(c)) p.heal(Math.min(6, targets.size() * 2) + ultimateRank);
             d.setLong("combo_until_" + c, 0);
         }
+        CAST_ATTEMPTS.succeeded(p, tick);
         say(p, ultimate ? "Suprema ativada!" : fire ? "Ataque de fogo ativado!" : "Habilidade ativada!");
     }
 
