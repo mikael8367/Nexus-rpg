@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "nexusrpg:items/waterbreathing_staff"
+  }
+}
