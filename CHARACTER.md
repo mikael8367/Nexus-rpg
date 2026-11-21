@@ -1,0 +1,21 @@
+# Nexus RPG — personagem (Forge 1.12.2)
+
+## API pública para integração
+
+`com.nexusrpg.character.CharacterProfile` é uma classe utilitária final. `characterClass(EntityPlayer)` retorna exatamente `warrior`, `mage`, `archer`, `assassin`, `paladin`, `necromancer` ou `""` se não escolhido; `level(EntityPlayer)` retorna nível (mínimo 1); `intelligence(EntityPlayer)` retorna inteligência total com bônus de classe; `consumeMana(EntityPlayer, int)` retorna `true` e desconta apenas se o jogador está no servidor, tem classe, custo não negativo e mana suficiente. Para uma habilidade, calcule o custo e chame `consumeMana` **uma só vez no servidor, na thread principal**, somente depois de validar todos os demais requisitos. Não use os dados do cliente para conceder efeitos. Não há reembolso automático.
+
+Outros métodos públicos: `stat(player, name)` com `health`, `mana`, `strength`, `defense`, `speed`, `intelligence`, `luck` (total inclui bônus de classe; desconhecido retorna 0); `points`, `xp`, `xpForNextLevel`, `mana`, `maxMana`; `addXp(player, amount)` só atua no servidor, para jogador com classe e valor positivo. Valores no cliente são cópias da última sincronização, não autoridade; chamadas mutáveis devem ocorrer na thread principal do servidor. `addXp` já sincroniza, assim como `consumeMana`. Não alterar diretamente NBT ou modificadores por UUID deste sistema.
+
+## Regras
+
+Na primeira entrada aparece uma seleção permanente; a tecla K reabre o menu, inclusive se foi fechado antes de escolher. Passe o cursor sobre a classe para ver seus bônus. O servidor só aceita a primeira escolha válida num perfil vazio e só gasta pontos disponíveis em atributos válidos. A cada nível são concedidos 3 pontos; XP necessário ao próximo nível = 100 + 30 × (nível - 1). O teto técnico é nível 1.000.000 e 10.000 pontos alocados por atributo. Entidades vivas não jogadoras derrotadas por dano cuja fonte real é um jogador dão entre 5 e 100 XP, conforme sua vida máxima; jogadores e suportes de armadura não dão XP. É uma regra simples, ainda não balanceada contra farm (inclusive criaturas geradas ou criadas repetidamente).
+
+Vida: +2 de vida máxima por ponto. Mana máxima: 100 + 10 por ponto de mana + 5 por inteligência. A cada segundo regenera 1 + inteligência/10 de mana; a cada 10 segundos regenera 0,5 + vida/20 de vida, limitado a 4,5. Força aumenta dano causado por jogador em 2,5% por ponto, limitado a +200%. Defesa reduz dano recebido em 1% por ponto, limitado a 60%, exceto dano absoluto ou que afeta criativo. Velocidade: +0,002 por ponto no atributo vanilla, limitada a +0,2. Sorte: +0,1 por ponto no atributo vanilla, limitado a +100. Estes valores são preliminares.
+
+O perfil usa `PlayerPersisted` / `NexusRpgCharacter`; é copiado na clonagem de jogador e sincronizado no login, respawn, mudança de dimensão e mudanças de dados. Os modificadores de vida, velocidade e sorte usam UUIDs próprios fixos, não salvos no atributo e removidos/reaplicados idempotentemente; os limites vanilla dos atributos também se aplicam. Não depende de chunks ou dados de mundo. Não altera classe após escolha; sem comando de reset.
+
+Tipos NBT inesperados nas duas tags de armazenamento não são substituídos. Tipos inválidos ou valores fora do intervalo dos campos conhecidos bloqueiam mutações no servidor, assim como a seleção não substitui um perfil parcial ou de classe desconhecida; a interface pode continuar pedindo uma escolha que o servidor recusará. Faça backup e investigue/restaure os dados antes de tentar reparar, sem editar NBT às cegas. Na clonagem, dados malformados são preservados quando não há conflito com dados já existentes no destino; conflitos não têm mesclagem automática.
+
+## Verificação e limites
+
+`compileJava` Java 8/Forge offline passou na auditoria; um teste isolado com stubs verificou 21 condições do perfil. Isto não substitui teste real cliente-servidor, morte, relog, dimensões, ataque, GUI, cooperação com outros mods, nem auditoria de balanceamento. XP é concedido no evento de morte, sem deduplicação por entidade nem confirmação posterior: outro mod que cancele no mesmo nível de prioridade após este listener, ou dispare o evento várias vezes, pode causar concessão indevida. Não há garantia de compatibilidade com versões anteriores ou com mudanças externas de NBT; fazer backup do mundo antes de qualquer teste.
