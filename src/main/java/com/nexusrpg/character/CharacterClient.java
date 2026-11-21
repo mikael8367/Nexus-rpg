@@ -20,22 +20,26 @@ import org.lwjgl.input.Keyboard;
 @SideOnly(Side.CLIENT)
 @Mod.EventBusSubscriber(modid=NexusRpg.MODID,value=Side.CLIENT)
 public final class CharacterClient {
-    private static KeyBinding key; private static EntityPlayer player; private static boolean received, prompt;
+    private static KeyBinding key; private static EntityPlayer player; private static net.minecraft.world.World world; private static boolean received, prompt;
     private CharacterClient() {}
     static void init() { key=new KeyBinding("key.nexusrpg.character",Keyboard.KEY_K,"key.categories.nexusrpg"); ClientRegistry.registerKeyBinding(key); }
     static void receive(NBTTagCompound data) {
         if(data==null) return;
-        Minecraft mc=Minecraft.getMinecraft(); mc.addScheduledTask(() -> {
-            if(mc.player==null) return;
-            CharacterProfile.root(mc.player); CharacterProfile.replace(mc.player,data); received=true;
-            if(CharacterProfile.characterClass(mc.player).isEmpty()) prompt=true;
-            else { prompt=false; if(mc.currentScreen instanceof SelectScreen) mc.displayGuiScreen(new CharacterRpgScreen()); }
-        });
+        // SnapshotHandler already checks the connection and player on the client thread.
+        // Do not defer a second time: that could apply an old snapshot after a world change.
+        Minecraft mc=Minecraft.getMinecraft();
+        if(mc.player==null) return;
+        CharacterProfile.root(mc.player); CharacterProfile.replace(mc.player,data); received=true;
+        if(CharacterProfile.characterClass(mc.player).isEmpty()) prompt=true;
+        else { prompt=false; if(mc.currentScreen instanceof SelectScreen) mc.displayGuiScreen(new CharacterRpgScreen()); }
     }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e) {
         if(e.phase!=TickEvent.Phase.END) return;
         Minecraft mc=Minecraft.getMinecraft();
-        if(mc.player!=player) { player=mc.player; received=false; prompt=false; if(player!=null) CharacterNetwork.send(2,0); }
+        if(mc.player!=player || mc.world!=world) {
+            player=mc.player; world=mc.world; received=false; prompt=false;
+            if(player!=null && world!=null) CharacterNetwork.send(2,0);
+        }
         if(player==null||!received) return;
         if(prompt && mc.currentScreen==null) { prompt=false; mc.displayGuiScreen(new SelectScreen()); }
         if(key!=null && key.isPressed() && mc.currentScreen==null)
