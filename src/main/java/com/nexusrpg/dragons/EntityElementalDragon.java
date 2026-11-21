@@ -94,6 +94,7 @@ public abstract class EntityElementalDragon extends EntityCreature implements IM
         float damage = melee ? 8.0F : 6.0F;
         // Set cooldown even if another mod cancels damage; prevents rapid repeated event spam.
         attackCooldown = melee ? 30 : 80;
+        if (!melee) DragonBreathVisual.show(this, target);
         // Forge 1.12 can return true even if LivingHurtEvent or LivingDamageEvent
         // cancels the actual health loss. Never apply secondary effects in that case.
         // Conservatively treat absorption-only hits as blocked too: absorption may be
