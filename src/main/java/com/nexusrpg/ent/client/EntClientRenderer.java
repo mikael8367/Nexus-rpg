@@ -25,6 +25,11 @@ public final class EntClientRenderer extends RenderLiving<EntityEntAnciao> {
     }
 
     @Override
+    protected float getDeathMaxRotation(EntityEntAnciao entity) {
+        return 0.0F;
+    }
+
+    @Override
     protected ResourceLocation getEntityTexture(EntityEntAnciao entity) {
         return TEXTURE;
     }
