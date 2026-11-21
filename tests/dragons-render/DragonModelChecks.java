@@ -35,6 +35,9 @@ public final class DragonModelChecks {
             float tail = part(m, "tail").rotateAngleY;
             m.setRotationAngles(1, 1, 9, 0, 0, 1, d);
             require(Math.abs(part(m, "tail").rotateAngleY - tail) > .01F, "tail sways");
+            // The diagonal walking gait applies on the ground; airborne legs are tucked.
+            d.onGround = true;
+            m.setRotationAngles(1, 1, 9, 0, 0, 1, d);
             Field f = DragonModel.class.getDeclaredField("legs");
             f.setAccessible(true);
             ModelRenderer[] legs = (ModelRenderer[]) f.get(m);
