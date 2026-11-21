@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "III",
+    "I I",
+    "I I"
+  ],
+  "key": {
+    "I": {
+      "item": "nexusrpg:auronite_ingot"
+    }
+  },
+  "result": {
+    "item": "nexusrpg:auronite_leggings"
+  }
+}

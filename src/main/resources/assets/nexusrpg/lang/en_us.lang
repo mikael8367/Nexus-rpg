@@ -139,3 +139,27 @@ entity.bellback.name=Bellback
 
 entity.dune_burrower.name=Dune Burrower
 entity.root_warden.name=Root Warden
+
+# Original craftable materials
+tile.nexusrpg.auronite_ore.name=Auronite Ore
+item.nexusrpg.auronite_ingot.name=Auronite Ingot
+item.nexusrpg.auronite_sword.name=Auronite Sword
+item.nexusrpg.auronite_pickaxe.name=Auronite Pickaxe
+item.nexusrpg.auronite_axe.name=Auronite Axe
+item.nexusrpg.auronite_shovel.name=Auronite Shovel
+item.nexusrpg.auronite_hoe.name=Auronite Hoe
+item.nexusrpg.auronite_helmet.name=Auronite Helmet
+item.nexusrpg.auronite_chestplate.name=Auronite Chestplate
+item.nexusrpg.auronite_leggings.name=Auronite Leggings
+item.nexusrpg.auronite_boots.name=Auronite Boots
+tile.nexusrpg.umbrilite_ore.name=Umbrilite Ore
+item.nexusrpg.umbrilite_ingot.name=Umbrilite Ingot
+item.nexusrpg.umbrilite_sword.name=Umbrilite Sword
+item.nexusrpg.umbrilite_pickaxe.name=Umbrilite Pickaxe
+item.nexusrpg.umbrilite_axe.name=Umbrilite Axe
+item.nexusrpg.umbrilite_shovel.name=Umbrilite Shovel
+item.nexusrpg.umbrilite_hoe.name=Umbrilite Hoe
+item.nexusrpg.umbrilite_helmet.name=Umbrilite Helmet
+item.nexusrpg.umbrilite_chestplate.name=Umbrilite Chestplate
+item.nexusrpg.umbrilite_leggings.name=Umbrilite Leggings
+item.nexusrpg.umbrilite_boots.name=Umbrilite Boots

@@ -29,6 +29,8 @@ import net.minecraft.util.text.TextComponentString;
 
 /** Persistent tower guardian with alternating server-authoritative spells. */
 public final class EntityTowerMage extends EntityMob implements IRangedAttackMob {
+    private static final byte CAST_ANIMATION_EVENT = 70;
+    private int castAnimationTicks;
     private int spellCooldown;
     private int nextSpell;
     private final BossInfoServer bossBar = new BossInfoServer(
@@ -83,6 +85,7 @@ public final class EntityTowerMage extends EntityMob implements IRangedAttackMob
             world.playSound(null, posX, posY, posZ, SoundEvents.ENTITY_WITCH_THROW,
                     SoundCategory.HOSTILE, 1.0F, 1.0F);
         }
+        world.setEntityState(this, CAST_ANIMATION_EVENT);
         nextSpell = (nextSpell + 1) % 3;
         spellCooldown = 40;
     }
@@ -102,6 +105,24 @@ public final class EntityTowerMage extends EntityMob implements IRangedAttackMob
 
     @Override
     public void setSwingingArms(boolean swingingArms) { }
+
+    /** Transient visual cue; all spell effects remain server-authoritative. */
+    @Override
+    public void handleStatusUpdate(byte id) {
+        if (id == CAST_ANIMATION_EVENT) {
+            if (world.isRemote) castAnimationTicks = 12;
+        } else {
+            super.handleStatusUpdate(id);
+        }
+    }
+
+    @Override
+    public void onUpdate() {
+        super.onUpdate();
+        if (world.isRemote && castAnimationTicks > 0) castAnimationTicks--;
+    }
+
+    public int getCastAnimationTicks() { return castAnimationTicks; }
 
     @Override
     public void writeEntityToNBT(NBTTagCompound tag) {

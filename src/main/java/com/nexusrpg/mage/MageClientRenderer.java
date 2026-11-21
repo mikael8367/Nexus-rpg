@@ -1,6 +1,5 @@
 package com.nexusrpg.mage;
 
-import net.minecraft.client.model.ModelWitch;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.RenderSnowball;
 import net.minecraft.init.Items;
@@ -30,10 +29,10 @@ public final class MageClientRenderer {
     }
 
     private static final class MageRender extends RenderLiving<EntityTowerMage> {
-        private static final ResourceLocation TEXTURE = new ResourceLocation("minecraft", "textures/entity/witch.png");
+        private static final ResourceLocation TEXTURE = new ResourceLocation("nexusrpg", "textures/entity/tower_mage.png");
 
         private MageRender(RenderManager manager) {
-            super(manager, new ModelWitch(0.0F), 0.5F);
+            super(manager, new ModelTowerMage(), 0.5F);
         }
 
         @Override

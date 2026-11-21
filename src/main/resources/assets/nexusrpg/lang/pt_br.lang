@@ -139,3 +139,27 @@ entity.bellback.name=Sino-dorsal
 
 entity.dune_burrower.name=Escavador das Dunas
 entity.root_warden.name=Guardião das Raízes
+
+# Original craftable materials
+tile.nexusrpg.auronite_ore.name=Minério de Auronita
+item.nexusrpg.auronite_ingot.name=Barra de Auronita
+item.nexusrpg.auronite_sword.name=Espada de Auronita
+item.nexusrpg.auronite_pickaxe.name=Picareta de Auronita
+item.nexusrpg.auronite_axe.name=Machado de Auronita
+item.nexusrpg.auronite_shovel.name=Pá de Auronita
+item.nexusrpg.auronite_hoe.name=Enxada de Auronita
+item.nexusrpg.auronite_helmet.name=Capacete de Auronita
+item.nexusrpg.auronite_chestplate.name=Peitoral de Auronita
+item.nexusrpg.auronite_leggings.name=Calças de Auronita
+item.nexusrpg.auronite_boots.name=Botas de Auronita
+tile.nexusrpg.umbrilite_ore.name=Minério de Umbrilita
+item.nexusrpg.umbrilite_ingot.name=Barra de Umbrilita
+item.nexusrpg.umbrilite_sword.name=Espada de Umbrilita
+item.nexusrpg.umbrilite_pickaxe.name=Picareta de Umbrilita
+item.nexusrpg.umbrilite_axe.name=Machado de Umbrilita
+item.nexusrpg.umbrilite_shovel.name=Pá de Umbrilita
+item.nexusrpg.umbrilite_hoe.name=Enxada de Umbrilita
+item.nexusrpg.umbrilite_helmet.name=Capacete de Umbrilita
+item.nexusrpg.umbrilite_chestplate.name=Peitoral de Umbrilita
+item.nexusrpg.umbrilite_leggings.name=Calças de Umbrilita
+item.nexusrpg.umbrilite_boots.name=Botas de Umbrilita
