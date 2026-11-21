@@ -32,7 +32,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 /** Right-click spells: all state changes and targeting happen on the server. */
 public final class ItemMagicStaff extends Item {
-    public enum Spell { ARCANE, HEAL, WARD, SWIFT }
+    public enum Spell { ARCANE, HEAL, WARD, SWIFT, FLAMEWARD, NIGHTVISION, WATERBREATHING }
     private final Spell spell;
     private final int cooldown;
 
@@ -85,6 +85,15 @@ public final class ItemMagicStaff extends Item {
                 if (!applyPotion(player, MobEffects.SPEED, 300)) return failedCast(player, staff, reserved);
                 particles((WorldServer) world, player, EnumParticleTypes.CLOUD);
                 break;
+            case FLAMEWARD:
+                if (!applyPotion(player, MobEffects.FIRE_RESISTANCE, 600)) return failedCast(player, staff, reserved);
+                particles((WorldServer) world, player, EnumParticleTypes.FLAME); break;
+            case NIGHTVISION:
+                if (!applyPotion(player, MobEffects.NIGHT_VISION, 1200)) return failedCast(player, staff, reserved);
+                particles((WorldServer) world, player, EnumParticleTypes.SPELL_MOB); break;
+            case WATERBREATHING:
+                if (!applyPotion(player, MobEffects.WATER_BREATHING, 600)) return failedCast(player, staff, reserved);
+                particles((WorldServer) world, player, EnumParticleTypes.WATER_BUBBLE); break;
             default: throw new IllegalStateException("Unknown spell");
         }
         player.getCooldownTracker().setCooldown(this, cooldown);
@@ -108,6 +117,9 @@ public final class ItemMagicStaff extends Item {
             case HEAL: return player.isEntityAlive() && player.getHealth() < player.getMaxHealth();
             case WARD: return canApplyPotion(player, MobEffects.RESISTANCE, 200);
             case SWIFT: return canApplyPotion(player, MobEffects.SPEED, 300);
+            case FLAMEWARD: return canApplyPotion(player, MobEffects.FIRE_RESISTANCE, 600);
+            case NIGHTVISION: return canApplyPotion(player, MobEffects.NIGHT_VISION, 1200);
+            case WATERBREATHING: return canApplyPotion(player, MobEffects.WATER_BREATHING, 600);
             case ARCANE: return true;
             default: return false;
         }
