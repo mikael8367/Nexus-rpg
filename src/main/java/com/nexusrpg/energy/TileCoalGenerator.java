@@ -86,15 +86,14 @@ public final class TileCoalGenerator extends TileProducer {
         return super.getCapability(capability, facing);
     }
     @Override public NBTTagCompound writeToNBT(NBTTagCompound tag) {
-        if (futureFields != null) {
-            for (String key : new String[]{"NexusRpgSchemaVersion", "Energy", "BurnTicks", "FuelInventory"})
-                if (tag.hasKey(key) && (!futureFields.hasKey(key) || !tag.getTag(key).equals(futureFields.getTag(key))))
-                    throw new IllegalStateException("Conflicting future schema output key: " + key);
-        }
-        for (String key : new String[]{"ForgeData", "ForgeCaps"}) {
-            NBTBase raw = key.equals("ForgeData") ? rawForgeData : rawForgeCaps;
-            if (raw != null && tag.hasKey(key) && !raw.equals(tag.getTag(key)))
-                throw new IllegalStateException("Conflicting Forge output key: " + key);
+        // Do not let caller-supplied roots masquerade as live Forge state. If
+        // they conflict with the real result, retain them inert, not active.
+        NBTTagCompound caller = new NBTTagCompound();
+        for (String key : new String[]{"NexusRpgSchemaVersion", "Energy", "BurnTicks", "FuelInventory", "ForgeData", "ForgeCaps"}) {
+            if (tag.hasKey(key)) {
+                caller.setTag(key, tag.getTag(key).copy());
+                tag.removeTag(key);
+            }
         }
         super.writeToNBT(tag); tag.setInteger("BurnTicks", burnTicks); tag.setTag("FuelInventory", inventory.serializeNBT());
         if (futureFields != null) {
@@ -103,13 +102,7 @@ public final class TileCoalGenerator extends TileProducer {
                 if (futureFields.hasKey(key)) tag.setTag(key, futureFields.getTag(key).copy());
             }
         }
-        restoreForge(tag, "ForgeData", rawForgeData);
-        restoreForge(tag, "ForgeCaps", rawForgeCaps);
-        for (String key : fuelArchives.getKeySet()) {
-            NBTBase value = fuelArchives.getTag(key);
-            if (!tag.hasKey(key)) tag.setTag(key, value.copy());
-            else if (!value.equals(tag.getTag(key))) archive(tag, value);
-        }
+        // Reserve unknown roots before allocating any new archive names.
         for (String key : extraRoots.getKeySet()) {
             NBTBase value = extraRoots.getTag(key);
             if (!tag.hasKey(key)) tag.setTag(key, value.copy());
@@ -119,7 +112,25 @@ public final class TileCoalGenerator extends TileProducer {
                 preserve(tag, "NexusRpgPreservedRoot", collision);
             }
         }
+        restoreForge(tag, "ForgeData", rawForgeData);
+        restoreForge(tag, "ForgeCaps", rawForgeCaps);
+        for (String key : fuelArchives.getKeySet()) {
+            NBTBase value = fuelArchives.getTag(key);
+            if (!tag.hasKey(key)) tag.setTag(key, value.copy());
+            else if (!value.equals(tag.getTag(key))) archive(tag, value);
+        }
+        for (String key : caller.getKeySet()) {
+            NBTBase value = caller.getTag(key);
+            if (!tag.hasKey(key) || !value.equals(tag.getTag(key)))
+                preserveCollision(tag, "NexusRpgCallerCollision", key, value);
+        }
         return tag;
+    }
+    private static void preserveCollision(NBTTagCompound tag, String prefix, String key, NBTBase value) {
+        NBTTagCompound envelope = new NBTTagCompound();
+        envelope.setString("Key", key);
+        envelope.setTag("Value", value.copy());
+        preserve(tag, prefix, envelope);
     }
     private static void restoreForge(NBTTagCompound tag, String key, NBTBase raw) {
         if (raw == null) return;
@@ -128,18 +139,20 @@ public final class TileCoalGenerator extends TileProducer {
             // ForgeData is live through TileEntity. Merge unregistered caps
             // without shadowing attached, actively serialized capabilities.
             if (key.equals("ForgeData")) return;
-            if (live != null && !(live instanceof NBTTagCompound))
-                throw new IllegalStateException("Cannot safely merge " + key);
+            if (live != null && !(live instanceof NBTTagCompound)) {
+                preserveCollision(tag, "NexusRpgForgeCollision", key, raw);
+                return;
+            }
             NBTTagCompound merged = live == null ? new NBTTagCompound() : ((NBTTagCompound) live).copy();
             NBTTagCompound original = (NBTTagCompound) raw;
             for (String name : original.getKeySet())
                 if (!merged.hasKey(name)) merged.setTag(name, original.getTag(name).copy());
             tag.setTag(key, merged);
         } else {
-            // One key cannot hold both malformed raw data and active state.
-            if (live != null && (!(live instanceof NBTTagCompound) || !((NBTTagCompound) live).hasNoTags()))
-                throw new IllegalStateException("Cannot safely preserve malformed " + key + " alongside active data");
-            tag.setTag(key, raw.copy());
+            // Keep live state at its Forge key. The incompatible raw value is
+            // an inert archive, never deserialized into an active capability.
+            if (live != null) preserveCollision(tag, "NexusRpgForgeCollision", key, raw);
+            else tag.setTag(key, raw.copy());
         }
     }
     @Override public void readFromNBT(NBTTagCompound tag) {
