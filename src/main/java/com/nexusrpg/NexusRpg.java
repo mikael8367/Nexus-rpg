@@ -35,6 +35,11 @@ public class NexusRpg {
         CompassNetwork.init();
         com.nexusrpg.character.CharacterNetwork.init();
         GameRegistry.registerWorldGenerator(new OreWorldGenerator(), 0);
+        com.nexusrpg.world.structures.WizardTower.setSpawnHandler((world, feet) -> {
+            if (com.nexusrpg.mage.MageRegistration.spawnTowerMage(world, feet) == null) {
+                logger.warn("Não foi possível criar o mago da torre em {}", feet);
+            }
+        });
         GameRegistry.registerWorldGenerator(new NexusStructureGenerator(), 1);
         logger.info("Nexus RPG: preparando sistemas...");
     }
