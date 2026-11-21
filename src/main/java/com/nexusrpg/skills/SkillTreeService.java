@@ -49,7 +49,7 @@ public final class SkillTreeService {
             String target = "combo_target_" + c;
             if (data.hasKey(target) && !data.hasKey(target, 8)) return false;
         }
-        return nonnegativeLong(data, "leech_ready") && nonnegativeLong(data, "pal_combo_start")
+        return nonnegativeLong(data, "assassin_dodge_ready_v1") && nonnegativeLong(data, "leech_ready") && nonnegativeLong(data, "pal_combo_start")
             && nonnegativeLong(data, "pal_combo_until");
     }
     private static boolean nonnegativeLong(NBTTagCompound data, String key) {
@@ -90,7 +90,12 @@ public final class SkillTreeService {
     /** Solicita a ativa (false) ou suprema (true); retorno e falhas são informados ao jogador no chat. */
     public static void activate(EntityPlayerMP p, boolean ultimate) {
         if (!server(p) || !profileValid(p) || !p.isEntityAlive() || p.isSpectator()) return;
-        SkillEvents.activateServer(p,ultimate);
+        SkillEvents.activateServer(p,ultimate,false);
+    }
+    /** Ataque de fogo do mago, com a mesma mana e recarga da ativa normal. */
+    public static void activateFire(EntityPlayerMP p) {
+        if (!server(p) || !profileValid(p) || !p.isEntityAlive() || p.isSpectator()) return;
+        SkillEvents.activateServer(p,false,true);
     }
     /** Retorna texto em português; a string vazia significa sucesso. Nunca aceita rank, custo ou classe do cliente. */
     public static String allocate(EntityPlayerMP p,String nodeId) {
