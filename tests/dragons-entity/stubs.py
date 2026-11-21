@@ -1,4 +1,5 @@
 stubs = {
+'com/nexusrpg/dragons/DragonBreathVisual.java': '''package com.nexusrpg.dragons; import net.minecraft.entity.EntityLivingBase; public class DragonBreathVisual { public static int calls; public static void show(EntityElementalDragon d, EntityLivingBase t) { calls++; } }''',
 'net/minecraft/entity/Entity.java': '''package net.minecraft.entity; public class Entity {}''',
 'net/minecraft/pathfinding/Path.java': '''package net.minecraft.pathfinding; public class Path {}''',
 'net/minecraft/pathfinding/PathNavigate.java': '''package net.minecraft.pathfinding; import net.minecraft.entity.Entity; import net.minecraft.util.math.BlockPos; public class PathNavigate {public int paths,ticks,clears; public float range=24; public float getPathSearchRange(){return range;} public Path getPathToPos(BlockPos p){paths++;return new Path();} public Path getPathToEntityLiving(Entity e){paths++;return new Path();} public void onUpdateNavigation(){ticks++;} public void clearPath(){clears++;}}''',
