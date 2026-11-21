@@ -171,3 +171,12 @@ item.nexusrpg.divers_reserve.name=Reserva do mergulhador
 tooltip.nexusrpg.expedition.dive=Sob a água: respiração aquática por 30 s.
 item.nexusrpg.lantern_dust.name=Pó de lanterna
 tooltip.nexusrpg.expedition.sight=Visão noturna por 30 s.
+
+key.nexusrpg.anim.slash=Golpe horizontal
+key.nexusrpg.anim.overhead=Golpe de cima
+key.nexusrpg.anim.thrust=Estocada
+key.nexusrpg.anim.roll=Rolamento visual
+key.nexusrpg.anim.guard=Guarda visual (segurar)
+key.nexusrpg.anim.drink=Beber poção (visual)
+key.nexusrpg.anim.stun=Atordoamento visual
+key.nexusrpg.anim.victory=Vitória visual
