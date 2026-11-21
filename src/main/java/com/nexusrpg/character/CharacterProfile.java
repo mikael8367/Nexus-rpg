@@ -76,11 +76,18 @@ public final class CharacterProfile {
     private static int index(EntityPlayer p) { String c=root(p).getString("class"); for(int i=0;i<CLASSES.length;i++) if(CLASSES[i].equals(c)) return i; return -1; }
     public static String characterClass(EntityPlayer p) { if(p==null) return ""; int i=index(p); return i<0?"":CLASSES[i]; }
     public static int level(EntityPlayer p) { return p==null?1:Math.min(1000000,Math.max(1,root(p).getInteger("level"))); }
-    /** Total stat, including the class bonus; returns 0 for unknown stat names. */
-    public static int stat(EntityPlayer p,String name) {
-        if(p==null) return 0; int c=index(p); if(c<0) return 0;
-        for(int i=0;i<STATS.length;i++) if(STATS[i].equals(name)) return Math.max(0,Math.min(10000,root(p).getInteger("stat_"+name)))+BONUS[c][i];
+    /** Read bonuses only from a complete, valid profile; never repair damaged NBT. */
+    static int statData(NBTTagCompound n,String name) {
+        if(n==null || n.getKeySet().isEmpty() || !validData(n)) return 0;
+        int c=-1; for(int i=0;i<CLASSES.length;i++) if(CLASSES[i].equals(n.getString("class"))) { c=i; break; }
+        if(c<0) return 0;
+        for(int i=0;i<STATS.length;i++) if(STATS[i].equals(name)) return n.getInteger("stat_"+name)+BONUS[c][i];
         return 0;
+    }
+    /** Total stat, including class bonus; invalid profiles and unknown stats give 0. */
+    public static int stat(EntityPlayer p,String name) {
+        if(!hasValidSelectedProfile(p)) return 0;
+        return statData(root(p),name);
     }
     public static int intelligence(EntityPlayer p) { return stat(p,"intelligence"); }
     public static int points(EntityPlayer p) { return p==null?0:Math.max(0,root(p).getInteger("points")); }
@@ -96,7 +103,9 @@ public final class CharacterProfile {
     static boolean select(EntityPlayer p,int choice) {
         // A nonempty unknown/partial profile must not be reset by class selection.
         if(!server(p)||choice<0||choice>=CLASSES.length||!root(p).getKeySet().isEmpty()) return false;
-        NBTTagCompound n=root(p); n.setString("class",CLASSES[choice]); n.setInteger("level",1); n.setInteger("xp",0); n.setInteger("points",0); n.setInteger("mana",maxMana(p));
+        NBTTagCompound n=root(p); n.setString("class",CLASSES[choice]); n.setInteger("level",1); n.setInteger("xp",0); n.setInteger("points",0);
+        // Complete the profile before reading class bonuses to calculate initial mana.
+        n.setInteger("mana",0); n.setInteger("mana",maxMana(p));
         apply(p); sync(p); return true;
     }
     static boolean allocate(EntityPlayer p,int which) {
