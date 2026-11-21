@@ -35,6 +35,8 @@ public final class ModBiomes {
     public static final Biome UMBRAL_REACH = create("umbral_reach", "Ermos do Umbral", 0.65F, 0.05F, 0.55F, 0.0F, 0x29243D);
     public static final Biome TITAN_CANOPY = create("titan_canopy", "Dossel dos Titãs", 0.35F, 0.90F, 0.38F, 0.85F, 0xE58A35);
 
+    public static final Biome MAGMA_WASTES = create("magma_wastes", "Ermos de Magma", 0.25F, 0.12F, 1.5F, 0.0F, 0xB44324);
+
     private ModBiomes() {}
 
     private static Biome create(String id, String name, float baseHeight, float heightVariation,
@@ -43,7 +45,7 @@ public final class ModBiomes {
             .setBaseHeight(baseHeight).setHeightVariation(heightVariation)
             .setTemperature(temperature).setRainfall(rainfall).setWaterColor(waterColor);
         if ("frost_crown".equals(id)) properties.setSnowEnabled();
-        if ("sunken_empire".equals(id) || "cinder_heart".equals(id) || "umbral_reach".equals(id)) {
+        if ("sunken_empire".equals(id) || "cinder_heart".equals(id) || "umbral_reach".equals(id) || "magma_wastes".equals(id)) {
             properties.setRainDisabled();
         }
         return new NexusBiome(id, properties).setRegistryName("nexusrpg", id);
@@ -52,7 +54,7 @@ public final class ModBiomes {
     @SubscribeEvent
     public static void registerBiomes(RegistryEvent.Register<Biome> event) {
         event.getRegistry().registerAll(ENCHANTED_GROVE, FROST_CROWN, SUNKEN_EMPIRE, WITCHING_MIRE,
-            CINDER_HEART, ROSA_SANCTUM, UMBRAL_REACH, TITAN_CANOPY);
+            CINDER_HEART, ROSA_SANCTUM, UMBRAL_REACH, TITAN_CANOPY, MAGMA_WASTES);
 
         // Entries are additive; existing vanilla and other mods' entries are never removed.
         add(ENCHANTED_GROVE, BiomeType.COOL, Type.FOREST, Type.MAGICAL, Type.LUSH);
@@ -63,7 +65,8 @@ public final class ModBiomes {
         add(ROSA_SANCTUM, BiomeType.COOL, Type.FOREST, Type.MAGICAL, Type.LUSH);
         add(UMBRAL_REACH, BiomeType.WARM, Type.DRY, Type.WASTELAND, Type.SPOOKY, Type.SPARSE);
         add(TITAN_CANOPY, BiomeType.WARM, Type.FOREST, Type.DENSE, Type.HILLS);
-        LOGGER.info("Oito biomas Nexus registrados e adicionados ao BiomeManager.");
+        add(MAGMA_WASTES, BiomeType.DESERT, Type.HOT, Type.DRY, Type.WASTELAND, Type.SPARSE);
+        LOGGER.info("Nove biomas Nexus registrados e adicionados ao BiomeManager.");
     }
 
     /** Somente diagnostico: nao consulta nem carrega chunks e nao altera a geracao. */
@@ -80,6 +83,7 @@ public final class ModBiomes {
         report(ROSA_SANCTUM, BiomeType.COOL);
         report(UMBRAL_REACH, BiomeType.WARM);
         report(TITAN_CANOPY, BiomeType.WARM);
+        report(MAGMA_WASTES, BiomeType.DESERT);
     }
 
     private static void report(Biome biome, BiomeType climate) {
@@ -137,6 +141,10 @@ public final class ModBiomes {
             } else if ("umbral_reach".equals(id)) {
                 topBlock = Blocks.STONE.getDefaultState(); fillerBlock = Blocks.STONE.getDefaultState();
                 decorator.treesPerChunk = -999; decorator.flowersPerChunk = 0; decorator.grassPerChunk = 0;
+            } else if ("magma_wastes".equals(id)) {
+                topBlock = Blocks.NETHERRACK.getDefaultState(); fillerBlock = Blocks.STONE.getDefaultState();
+                decorator.treesPerChunk = -999; decorator.flowersPerChunk = 0; decorator.grassPerChunk = 0;
+                decorator.generateFalls = false;
             } else if ("titan_canopy".equals(id)) {
                 decorator.treesPerChunk = 10; decorator.flowersPerChunk = 2; decorator.grassPerChunk = 8;
             }
