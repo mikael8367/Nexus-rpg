@@ -49,6 +49,8 @@ import net.minecraftforge.oredict.OreDictionary;
 public class TileDigitalMiner extends TileEntity implements ITickable {
     private static final int SIZE = 16 * 128 * 16, COST = 200, CAPACITY = 100000;
     private int energy, cursor, cooldown;
+    // Preserve malformed inventory data for manual recovery rather than discarding it on save.
+    @Nullable private NBTTagCompound preservedOutput;
     private UUID ownerId;
     private String ownerName = "";
     private boolean processing;
@@ -204,6 +206,7 @@ public class TileDigitalMiner extends TileEntity implements ITickable {
         super.writeToNBT(nbt);
         nbt.setInteger("Energy", energy); nbt.setInteger("Cursor", cursor);
         nbt.setInteger("Cooldown", cooldown); nbt.setTag("Output", inventory.serializeNBT());
+        if (preservedOutput != null) nbt.setTag("NexusRpgOriginalOutput", preservedOutput.copy());
         if (ownerId != null) { nbt.setString("OwnerUUID", ownerId.toString()); nbt.setString("OwnerName", ownerName); }
         return nbt;
     }
@@ -215,6 +218,23 @@ public class TileDigitalMiner extends TileEntity implements ITickable {
         ownerId = null; ownerName = nbt.getString("OwnerName");
         try { if (nbt.hasKey("OwnerUUID")) ownerId = UUID.fromString(nbt.getString("OwnerUUID")); }
         catch (IllegalArgumentException ignored) { ownerId = null; }
-        if (nbt.hasKey("Output", 10)) inventory.deserializeNBT(nbt.getCompoundTag("Output"));
+        // ItemStackHandler otherwise trusts the serialized Size and may resize
+        // the machine inventory, breaking GUI slots or allocating unbounded memory.
+        NBTTagCompound outputTag = nbt.hasKey("Output", 10)
+            ? nbt.getCompoundTag("Output").copy() : new NBTTagCompound();
+        preservedOutput = nbt.hasKey("NexusRpgOriginalOutput", 10)
+            ? nbt.getCompoundTag("NexusRpgOriginalOutput").copy() : null;
+        if (preservedOutput == null && nbt.hasKey("Output", 10)) {
+            boolean malformed = !outputTag.hasKey("Size", 3) || outputTag.getInteger("Size") != 27;
+            net.minecraft.nbt.NBTTagList items = outputTag.getTagList("Items", 10);
+            for (int i = 0; i < items.tagCount(); i++) {
+                NBTTagCompound item = items.getCompoundTagAt(i);
+                int slot = item.getInteger("Slot");
+                if (!item.hasKey("Slot", 3) || slot < 0 || slot >= 27) malformed = true;
+            }
+            if (malformed) preservedOutput = outputTag.copy();
+        }
+        outputTag.setInteger("Size", 27);
+        inventory.deserializeNBT(outputTag);
     }
 }
