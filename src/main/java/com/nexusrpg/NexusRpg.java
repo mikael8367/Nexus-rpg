@@ -34,6 +34,7 @@ public class NexusRpg {
         NexusCreativeTab.init();
         CompassNetwork.init();
         com.nexusrpg.character.CharacterNetwork.init();
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new com.nexusrpg.rest.RestEvents());
         GameRegistry.registerWorldGenerator(new OreWorldGenerator(), 0);
         com.nexusrpg.world.structures.WizardTower.setSpawnHandler((world, feet) -> {
             if (com.nexusrpg.mage.MageRegistration.spawnTowerMage(world, feet) == null) {
