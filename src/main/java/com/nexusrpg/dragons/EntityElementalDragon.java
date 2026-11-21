@@ -18,15 +18,19 @@ import net.minecraft.pathfinding.Path;
 import net.minecraft.pathfinding.PathNavigate;
 import net.minecraft.pathfinding.PathNavigateGround;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.DamageSource;
 import net.minecraft.world.World;
 
-/** Ground-based encounter: targeted attacks only, no terrain damage or natural spawns. */
+/** Encounter with experimental, bounded combat flight; no terrain damage or natural spawns. */
 public abstract class EntityElementalDragon extends EntityCreature implements IMob {
     public enum Element { FIRE, WATER, WIND, EARTH }
     private static final int COOLDOWN_MAX = 200;
     private int attackCooldown;
     private int pathCooldown;
+    // Landing intent only, never a persistent immunity to fall damage.
+    private boolean flightAssist;
+    private EntityLivingBase flightTarget;
 
     public EntityElementalDragon(World world) {
         super(world);
@@ -79,7 +83,82 @@ public abstract class EntityElementalDragon extends EntityCreature implements IM
 
     @Override protected void updateAITasks() {
         super.updateAITasks();
-        if (!world.isRemote && attackCooldown > 0) --attackCooldown;
+        if (!world.isRemote) {
+            if (attackCooldown > 0) --attackCooldown;
+            updateFlight();
+            flightTarget = null;
+        }
+    }
+
+    @Override public void onLivingUpdate() {
+        // updateAITasks is not called with NoAI, including immediately after reload.
+        if (!world.isRemote && isAIDisabled()) {
+            if (flightAssist) { motionX = 0; motionZ = 0; motionY = Math.min(0, motionY); }
+            flightAssist = false;
+            flightTarget = null;
+        }
+        super.onLivingUpdate();
+    }
+
+    /** Powered flight never teleports, disables gravity/collisions, or requests chunks. */
+    private void updateFlight() {
+        EntityLivingBase target = flightTarget;
+        // Clear even when the surrounding chunks are no longer loaded.
+        boolean wasAssisted = flightAssist;
+        if (onGround) flightAssist = false;
+        if (!world.isAreaLoaded(getPosition(), 8)) {
+            if (wasAssisted) {
+                getNavigator().clearPath();
+                getMoveHelper().setMoveTo(posX, posY, posZ, 0.0D);
+                motionX = 0; motionZ = 0; motionY = Math.min(0, motionY);
+            }
+            flightAssist = false;
+            return;
+        }
+        // Lava checks may access blocks: always perform them after the loaded guard.
+        if (isInWater() || isInLava() || isRiding() || isBeingRidden()) {
+            flightAssist = false;
+            return;
+        }
+        boolean pursue = target == getAttackTarget() && eligible(target)
+                && Double.isFinite(posX) && Double.isFinite(posY) && Double.isFinite(posZ)
+                && Double.isFinite(target.posX) && Double.isFinite(target.posY) && Double.isFinite(target.posZ)
+                && getDistanceSq(target) <= 144.0D;
+        if (!pursue && !flightAssist) return;
+        double dx = 0, dy = -0.12D, dz = 0;
+        if (pursue) {
+            double top = Math.max(1.0D, world.getActualHeight() - 5.0D);
+            double desiredY = Math.max(1.0D, Math.min(top, target.posY + 5.0D));
+            dy = Math.max(-0.12D, Math.min(0.16D, (desiredY - posY) * 0.12D));
+            double x = target.posX - posX, z = target.posZ - posZ;
+            double length = Math.sqrt(x*x + z*z);
+            if (length > 7.0D) { dx = x / length * 0.16D; dz = z / length * 0.16D; }
+            if (posY >= top) dy = Math.min(dy, 0.0D);
+            else dy = Math.min(dy, top - posY);
+            if (posY <= 1.0D) dy = Math.max(dy, 0.0D);
+        }
+        AxisAlignedBB box = getEntityBoundingBox();
+        AxisAlignedBB sweep = box.expand(dx, dy, dz);
+        // Don't steer into fluids; hand control back to vanilla and its swim AI.
+        if (world.containsAnyLiquid(sweep)) {
+            flightAssist = false;
+            motionX = 0; motionZ = 0; motionY = Math.min(0, motionY);
+            return;
+        }
+        // Test horizontal and ascending paths separately: a floor below the dragon must
+        // not prevent horizontal steering. Vanilla clips the final motion per axis.
+        if (!world.getCollisionBoxes(this, box.expand(dx, 0, dz)).isEmpty()) {
+            dx = 0; dz = 0;
+        }
+        if (dy > 0 && !world.getCollisionBoxes(this, box.expand(0, dy, 0)).isEmpty()) dy = 0;
+        // Negative motion is intentionally retained: vanilla clips it and sets onGround.
+        getNavigator().clearPath();
+        getMoveHelper().setMoveTo(posX, posY, posZ, 0.0D);
+        motionX = dx; motionY = dy; motionZ = dz;
+        flightAssist = !onGround || dy > 0;
+        // Only erase fall distance while the bounded controller is actually running.
+        // Normal fall damage resumes immediately when control is relinquished.
+        if (flightAssist) fallDistance = 0;
     }
 
     private boolean eligible(EntityLivingBase target) {
@@ -141,6 +220,7 @@ public abstract class EntityElementalDragon extends EntityCreature implements IM
             getLookHelper().setLookPositionWithEntity(target, 30.0F, 30.0F);
             boolean visible = distance <= 144.0D && getEntitySenses().canSee(target);
             if (visible) {
+                flightTarget = target;
                 getNavigator().clearPath();
                 if (attackCooldown == 0) elementalStrike(target, distance <= 16.0D);
             } else if (--pathCooldown <= 0 && distance <= 24.0D * 24.0D) {
@@ -153,10 +233,13 @@ public abstract class EntityElementalDragon extends EntityCreature implements IM
     @Override public void writeEntityToNBT(NBTTagCompound tag) {
         super.writeEntityToNBT(tag);
         tag.setInteger("DragonAttackCooldown", attackCooldown);
+        tag.setBoolean("DragonFlightLanding", flightAssist);
     }
     @Override public void readEntityFromNBT(NBTTagCompound tag) {
         super.readEntityFromNBT(tag);
         attackCooldown = Math.max(0, Math.min(COOLDOWN_MAX, tag.getInteger("DragonAttackCooldown")));
+        flightAssist = tag.getBoolean("DragonFlightLanding");
+        flightTarget = null;
         enablePersistence();
     }
 }
