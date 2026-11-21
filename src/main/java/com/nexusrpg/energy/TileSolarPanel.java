@@ -3,6 +3,9 @@ package com.nexusrpg.energy;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.play.server.SPacketUpdateTileEntity;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
@@ -18,6 +21,12 @@ public final class TileSolarPanel extends TileProducer {
         this.origin = origin.toImmutable();
         this.structure = structure;
         markDirty();
+        // Block placement sends the tile before this post-placement configuration.
+        // Explicitly send its identity to already watching clients as well.
+        if (world != null && !world.isRemote) {
+            IBlockState state = world.getBlockState(pos);
+            world.notifyBlockUpdate(pos, state, state, 3);
+        }
     }
     boolean belongsTo(BlockPos origin, UUID structure) {
         return this.origin != null && this.origin.equals(origin) && structure != null && structure.equals(this.structure);
@@ -66,6 +75,20 @@ public final class TileSolarPanel extends TileProducer {
         if (tag.hasKey("SolarOrigin") && tag.hasUniqueId("SolarStructure")) {
             origin = BlockPos.fromLong(tag.getLong("SolarOrigin"));
             structure = tag.getUniqueId("SolarStructure");
+        }
+    }
+    @Override public NBTTagCompound getUpdateTag() {
+        // TileEntity's default update tag contains only vanilla bookkeeping.
+        return writeToNBT(new NBTTagCompound());
+    }
+    @Override public SPacketUpdateTileEntity getUpdatePacket() {
+        return new SPacketUpdateTileEntity(pos, 0, getUpdateTag());
+    }
+    @Override public void onDataPacket(NetworkManager net, SPacketUpdateTileEntity packet) {
+        readFromNBT(packet.getNbtCompound());
+        if (world != null && world.isRemote) {
+            // A cable beside any of the cells may now connect to the controller.
+            world.markBlockRangeForRenderUpdate(pos.add(-1, -1, -1), pos.add(1, 1, 1));
         }
     }
     @Override public boolean onlyOpsCanSetNbt() { return true; }
