@@ -40,6 +40,10 @@ O JAR será gerado em `build/libs/`.
 
 Consulte [CACADAS.md](CACADAS.md) para comandos, objetivos, recompensas e limitações das caçadas experimentais.
 
+## Jornadas automáticas
+
+No modo sobrevivência ou aventura, há duas jornadas independentes de exploração e fabricação. Veja [objetivos, recompensas e limitações](tests/journeys/README.md).
+
 ## Estrutura
 
 - `com.nexusrpg.NexusRpg`: classe principal e ciclo de vida do mod.
