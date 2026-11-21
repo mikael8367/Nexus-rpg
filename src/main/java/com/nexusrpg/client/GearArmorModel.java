@@ -71,6 +71,18 @@ public final class GearArmorModel extends ModelBiped {
         }
     }
 
+    @Override
+    public void setRotationAngles(float limbSwing, float limbSwingAmount, float ageInTicks,
+            float netHeadYaw, float headPitch, float scaleFactor, net.minecraft.entity.Entity entity) {
+        com.nexusrpg.client.anim.PlayerPose.resetPoints(this, 2F);
+        super.setRotationAngles(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, scaleFactor, entity);
+        com.nexusrpg.client.anim.PlayerAnim anim = com.nexusrpg.client.anim.PlayerAnimManager.get(entity, ageInTicks);
+        if (anim != null) {
+            com.nexusrpg.client.anim.PlayerPose.apply(this, anim, com.nexusrpg.client.anim.PlayerAnimManager.time(entity, ageInTicks));
+            copyModelAngles(bipedHead, bipedHeadwear);
+        }
+    }
+
     private void add(ModelRenderer parent, float x, float y, float z, int width, int height, int depth) {
         ModelRenderer relief = new ModelRenderer(this, reliefU, reliefV);
         relief.addBox(x, y, z, width, height, depth, 0.0F);
