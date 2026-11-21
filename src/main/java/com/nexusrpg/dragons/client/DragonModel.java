@@ -123,25 +123,49 @@ public final class DragonModel extends ModelBase {
         body.render(scale);
     }
 
+    private static float finiteOrZero(float value) {
+        return Float.isFinite(value) ? value : 0F;
+    }
+
+    // Use double for phase multiplication, so even extreme finite inputs do not overflow.
+    private static float wave(float time, double speed, double offset) {
+        return (float) Math.sin((double) time * speed + offset);
+    }
+
     @Override
     public void setRotationAngles(float swing, float amount, float age, float yaw, float pitch, float scale, Entity entity) {
-        head.rotateAngleY = MathHelper.clamp(yaw, -45F, 45F) * 0.017453292F;
-        head.rotateAngleX = MathHelper.clamp(pitch, -30F, 30F) * 0.017453292F;
-        float walk = MathHelper.clamp(amount, 0F, 1F);
+        swing = finiteOrZero(swing);
+        age = finiteOrZero(age);
+        head.rotateAngleY = MathHelper.clamp(finiteOrZero(yaw), -45F, 45F) * 0.017453292F;
+        head.rotateAngleX = MathHelper.clamp(finiteOrZero(pitch), -30F, 30F) * 0.017453292F;
+        float walk = MathHelper.clamp(finiteOrZero(amount), 0F, 1F);
+        // A passenger can ride the dragon during flight; exclude the dragon riding
+        // another entity, not a dragon carrying passengers. This is only a visual
+        // airborne approximation: vanilla does not expose a generic flying flag.
+        boolean airborne = entity != null && !entity.onGround && !entity.isInWater() && !entity.isRiding();
+        float flapCycle = wave(age, 0.45, 0);
+        body.rotateAngleX = airborne ? -0.12F + 0.035F * flapCycle : 0F;
         for (int i = 0; i < legs.length; i++) {
-            // Diagonal pairs move together.
-            float phase = (i == 0 || i == 3) ? 0F : (float)Math.PI;
-            legs[i].rotateAngleX = MathHelper.cos(swing * 0.6662F + phase) * 0.6F * walk;
+            if (airborne) {
+                // Hold the feet tucked under the body rather than running in midair.
+                legs[i].rotateAngleX = (i < 2 ? -0.55F : 0.45F) + 0.06F * flapCycle;
+            } else {
+                // Diagonal pairs move together, with no pose leaking between mobs.
+                double phase = (i == 0 || i == 3) ? Math.PI / 2 : -Math.PI / 2;
+                legs[i].rotateAngleX = wave(swing, 0.6662, phase) * 0.6F * walk;
+            }
         }
-        tail.rotateAngleY = MathHelper.sin(age * 0.09F) * 0.16F;
-        tailTip.rotateAngleY = MathHelper.sin(age * 0.09F - 0.7F) * 0.22F;
-        // No server animation interface is required. onGround distinguishes an airborne flap
-        // from a slow idle flex; age includes render partial ticks in RenderLiving.
-        float flap = entity.onGround ? 0.12F + 0.08F * MathHelper.sin(age * 0.12F)
-                                     : 0.12F + 0.48F * MathHelper.sin(age * 0.45F);
+        tail.rotateAngleY = wave(age, 0.09, 0) * 0.16F;
+        tailTip.rotateAngleY = wave(age, 0.09, -0.7) * 0.22F;
+        tail.rotateAngleX = airborne ? 0.10F + 0.04F * flapCycle : 0F;
+        tailTip.rotateAngleX = airborne ? 0.06F + 0.04F * wave(age, 0.45, -0.5) : 0F;
+        // Mirrored shoulder rotations alternate an upstroke and a downstroke.
+        float flap = airborne ? 0.05F + 0.65F * flapCycle
+                              : 0.12F + 0.08F * wave(age, 0.12, 0);
         wingLeft.rotateAngleZ = flap;
         wingRight.rotateAngleZ = -flap;
-        wingLeft.rotateAngleY = 0.10F;
-        wingRight.rotateAngleY = -0.10F;
+        float sweep = airborne ? 0.16F + 0.09F * wave(age, 0.45, -0.8) : 0.10F;
+        wingLeft.rotateAngleY = sweep;
+        wingRight.rotateAngleY = -sweep;
     }
 }
