@@ -33,6 +33,10 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
  * Chunks loaded from disk are never eligible, even if population was incomplete.
  */
 public final class NexusStructureGenerator implements IWorldGenerator {
+    // Candidate rate, before biome, terrain and safety checks; not a guarantee.
+    private static final int CANDIDATE_CHANCE = 8;
+    // Reject thin cave roofs and thin floating shelves under the whole footprint.
+    private static final int FOUNDATION_DEPTH = 5;
     // A live loaded chunk holds its own identity; weak keys do not retain unloaded chunks/worlds.
     private final Set<Chunk> loadedFromDisk = Collections.synchronizedSet(
         Collections.newSetFromMap(new WeakHashMap<Chunk, Boolean>()));
@@ -52,7 +56,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
     @Override
     public void generate(Random random, int chunkX, int chunkZ, World world,
                          IChunkGenerator chunkGenerator, IChunkProvider chunkProvider) {
-        if (world.isRemote || world.provider.getDimension() != 0 || random.nextInt(80) != 0) return;
+        if (world.isRemote || world.provider.getDimension() != 0 || random.nextInt(CANDIDATE_CHANCE) != 0) return;
         // getLoadedChunk never generates or loads a neighbouring chunk.
         Chunk chunk = chunkProvider.getLoadedChunk(chunkX, chunkZ);
         if (chunk == null || loadedFromDisk.contains(chunk)) return;
@@ -66,16 +70,24 @@ public final class NexusStructureGenerator implements IWorldGenerator {
         // 9x9 inspection area stays entirely inside this chunk. No chunk-border writes.
         int max = Integer.MIN_VALUE, min = Integer.MAX_VALUE;
         int[][] heights = new int[9][9];
+        Map<BlockPos, IBlockState> foundation = new LinkedHashMap<BlockPos, IBlockState>();
         for (int dx = -4; dx <= 4; dx++) for (int dz = -4; dz <= 4; dz++) {
             int x = cx + dx, z = cz + dz;
             if (chunk.getBiome(new BlockPos(x, 0, z), world.getBiomeProvider()) != biome) return;
             int h = chunk.getHeightValue(x & 15, z & 15);
-            if (h < 2 || h + 12 >= world.getHeight()) return;
+            if (h < FOUNDATION_DEPTH || h + 12 >= world.getHeight()) return;
             Block surface = chunk.getBlockState(x & 15, h - 1, z & 15).getBlock();
             if (!isGround(surface)) return;
             heights[dx + 4][dz + 4] = h;
             if (Math.abs(dx) <= 3 && Math.abs(dz) <= 3) {
                 min = Math.min(min, h); max = Math.max(max, h);
+                for (int depth = 1; depth <= FOUNDATION_DEPTH; depth++) {
+                    BlockPos base = new BlockPos(x, h - depth, z);
+                    IBlockState state = chunk.getBlockState(base);
+                    if (!isFoundation(state.getBlock()) || state.getBlock().hasTileEntity(state) ||
+                        chunk.getTileEntityMap().containsKey(base)) return;
+                    foundation.put(base, state);
+                }
             }
             // Reject buildings, tile entities and unknown blocks anywhere in the column,
             // including underground structures and roofs above the surface.
@@ -101,14 +113,17 @@ public final class NexusStructureGenerator implements IWorldGenerator {
         // Equal chance for the original and each design in this biome.
         int[] first = {0, 7, 14, 20, 26, 32, 38, 44};
         int[] count = {7, 7, 6, 6, 6, 6, 6, 6};
-        int choice = random.nextInt(count[style] + 1);
+        boolean eligibleTower = WizardTower.supports(style);
+        int choice = random.nextInt(count[style] + 1 + (eligibleTower ? 1 : 0));
+        boolean wizardTower = eligibleTower && choice == count[style] + 1;
         if (choice == 0) {
             decorate(plan, cx, max, cz, style);
         } else {
             int design = first[style] + choice - 1;
             Map<BlockPos, IBlockState> decoration = new LinkedHashMap<BlockPos, IBlockState>();
             try {
-                if (design <= 16) NovaStructuresA.build(decoration, cx, max, cz, design, style);
+                if (wizardTower) WizardTower.build(decoration, cx, max, cz, style);
+                else if (design <= 16) NovaStructuresA.build(decoration, cx, max, cz, design, style);
                 else if (design <= 33) NovaStructuresB.build(decoration, cx, max, cz, design, style);
                 else NovaStructuresC.build(decoration, cx, max, cz, design, style);
             } catch (IllegalArgumentException invalidPlan) {
@@ -153,6 +168,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             }
             // Callbacks during later writes may have changed earlier positions.
             if (chunkProvider.getLoadedChunk(chunkX, chunkZ) != chunk) return;
+            if (!foundationUnchanged(chunk, foundation)) return;
             for (Map.Entry<BlockPos, IBlockState> entry : plan.entrySet())
                 if (!chunk.getBlockState(entry.getKey()).equals(entry.getValue()) ||
                     chunk.getTileEntityMap().containsKey(entry.getKey())) return;
@@ -170,6 +186,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             if (!placed || chestState.getBlock() != Blocks.CHEST || !(tile instanceof TileEntityChest) ||
                 chunk.getBlockState(chestPos.up()).getBlock() != Blocks.AIR ||
                 chunk.getTileEntityMap().containsKey(chestPos.up())) return;
+            if (!foundationUnchanged(chunk, foundation)) return;
             for (Map.Entry<BlockPos, IBlockState> entry : plan.entrySet())
                 if (!chunk.getBlockState(entry.getKey()).equals(entry.getValue()) ||
                     chunk.getTileEntityMap().containsKey(entry.getKey())) return;
@@ -190,6 +207,25 @@ public final class NexusStructureGenerator implements IWorldGenerator {
                     rollback(world, chunkProvider, chunk, chunkX, chunkZ, plan, original, attempted);
             }
         }
+        // Notify only after a successful complete tower, without loading chunks.
+        if (complete && wizardTower && chunkProvider.getLoadedChunk(chunkX, chunkZ) == chunk) {
+            BlockPos feet = WizardTower.spawnFeet(cx, max, cz);
+            BlockPos support = new BlockPos(feet.getX(), feet.getY() - 1, feet.getZ());
+            if (chunk.getBlockState(support).getBlock() == Blocks.PLANKS &&
+                chunk.getBlockState(feet).getBlock() == Blocks.AIR &&
+                chunk.getBlockState(feet.up()).getBlock() == Blocks.AIR &&
+                !chunk.getTileEntityMap().containsKey(support) &&
+                !chunk.getTileEntityMap().containsKey(feet) &&
+                !chunk.getTileEntityMap().containsKey(feet.up()))
+                WizardTower.afterGenerated(world, feet);
+        }
+    }
+
+    private static boolean foundationUnchanged(Chunk chunk, Map<BlockPos, IBlockState> foundation) {
+        for (Map.Entry<BlockPos, IBlockState> entry : foundation.entrySet())
+            if (!chunk.getBlockState(entry.getKey()).equals(entry.getValue()) ||
+                chunk.getTileEntityMap().containsKey(entry.getKey())) return false;
+        return true;
     }
 
     /** Reject malformed, unsafe or out-of-envelope additions before any world write. */
@@ -258,7 +294,12 @@ public final class NexusStructureGenerator implements IWorldGenerator {
         for (int h = 1; h <= 2; h++) {
             BlockPos p = new BlockPos(x, y + h, z);
             IBlockState state = plan.containsKey(p) ? plan.get(p) : chunk.getBlockState(p);
-            if (state.getBlock() != Blocks.AIR) return false;
+            Block block = state.getBlock();
+            // These vanilla plants have no collision and can be walked through.
+            // Do not generalize to all replaceable blocks: deep snow can block the way.
+            if (block != Blocks.AIR && block != Blocks.TALLGRASS && block != Blocks.YELLOW_FLOWER &&
+                block != Blocks.RED_FLOWER && block != Blocks.DEADBUSH &&
+                block != Blocks.BROWN_MUSHROOM && block != Blocks.RED_MUSHROOM) return false;
         }
         return true;
     }
@@ -288,7 +329,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
                 NBTTagCompound start = features.getCompoundTag(key);
                 if (!start.hasKey("BB", 11)) return true;
                 int[] bb = start.getIntArray("BB");
-                if (bb.length != 6 || bb[0] > bb[3] || bb[2] > bb[5]) return true;
+                if (bb.length != 6 || bb[0] > bb[3] || bb[1] > bb[4] || bb[2] > bb[5]) return true;
                 if (bb[0] <= maxX && bb[3] >= minX && bb[2] <= maxZ && bb[5] >= minZ) return true;
             }
         }
@@ -309,6 +350,10 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             b == Blocks.COAL_ORE || b == Blocks.IRON_ORE || b == Blocks.GOLD_ORE || b == Blocks.REDSTONE_ORE ||
             b == Blocks.LIT_REDSTONE_ORE || b == Blocks.LAPIS_ORE || b == Blocks.DIAMOND_ORE || b == Blocks.EMERALD_ORE ||
             b == ModBlocks.MITHRIL_ORE || b == ModBlocks.ADAMANTITE_ORE || b == ModBlocks.DRACONITE_ORE;
+    }
+    private static boolean isFoundation(Block b) {
+        return isNatural(b) && !isReplaceableSurface(b) && b != Blocks.WATER &&
+            b != Blocks.FLOWING_WATER && b != Blocks.LAVA && b != Blocks.FLOWING_LAVA;
     }
     private static int styleOf(Biome b) {
         if (b == ModBiomes.ENCHANTED_GROVE) return 0;
