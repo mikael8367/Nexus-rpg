@@ -163,3 +163,11 @@ item.nexusrpg.umbrilite_helmet.name=Umbrilite Helmet
 item.nexusrpg.umbrilite_chestplate.name=Umbrilite Chestplate
 item.nexusrpg.umbrilite_leggings.name=Umbrilite Leggings
 item.nexusrpg.umbrilite_boots.name=Umbrilite Boots
+
+# Expedition aids
+item.nexusrpg.quenching_salve.name=Quenching Salve
+tooltip.nexusrpg.expedition.quench=Extinguishes current fire. Does not prevent new burns.
+item.nexusrpg.divers_reserve.name=Diver’s Reserve
+tooltip.nexusrpg.expedition.dive=Underwater: water breathing for 30 s.
+item.nexusrpg.lantern_dust.name=Lantern Dust
+tooltip.nexusrpg.expedition.sight=Night vision for 30 s.
