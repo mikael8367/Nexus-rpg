@@ -26,7 +26,7 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 /** Server-authoritative, bounded search; never requests or generates chunks. */
 public final class CompassNetwork {
-    public static final String[] IDS = {"enchanted_grove", "frost_crown", "sunken_empire", "witching_mire", "cinder_heart", "rosa_sanctum", "umbral_reach", "titan_canopy"};
+    public static final String[] IDS = {"enchanted_grove", "frost_crown", "sunken_empire", "witching_mire", "cinder_heart", "rosa_sanctum", "umbral_reach", "titan_canopy", "magma_wastes"};
     public static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel("nexusrpg_compass");
     private static final int RADIUS = 2048, STEP = 128, BUDGET = 12, MAX_JOBS = 4;
     private static final List<int[]> OFFSETS = offsets();
@@ -52,6 +52,7 @@ public final class CompassNetwork {
             case 2: return ModBiomes.SUNKEN_EMPIRE; case 3: return ModBiomes.WITCHING_MIRE;
             case 4: return ModBiomes.CINDER_HEART; case 5: return ModBiomes.ROSA_SANCTUM;
             case 6: return ModBiomes.UMBRAL_REACH; case 7: return ModBiomes.TITAN_CANOPY;
+            case 8: return ModBiomes.MAGMA_WASTES;
             default: return null;
         }
     }
