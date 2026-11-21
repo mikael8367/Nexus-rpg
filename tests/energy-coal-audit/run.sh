@@ -9,6 +9,7 @@ deps=$(find "$GRADLE_USER_HOME/caches/modules-2/files-2.1" -name '*.jar' -print 
 cp="build/classes/java/main:$forge:$deps"
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT HUP INT TERM
-"$JAVA_HOME/bin/javac" -source 8 -target 8 -cp "$cp" -d "$dir" src/main/java/com/nexusrpg/energy/TileCoalGenerator.java tests/energy-coal-audit/CoalNbtAuditTest.java tests/energy-regression/CoalInventoryRegressionTest.java
+"$JAVA_HOME/bin/javac" -source 8 -target 8 -cp "$cp" -d "$dir" src/main/java/com/nexusrpg/energy/TileCoalGenerator.java tests/energy-coal-audit/CoalNbtAuditTest.java tests/energy-coal-audit/CoalUnknownRootTest.java tests/energy-regression/CoalInventoryRegressionTest.java
 "$JAVA_HOME/bin/java" -cp "$dir:$cp" com.nexusrpg.energy.CoalNbtAuditTest
 "$JAVA_HOME/bin/java" -cp "$dir:$cp" com.nexusrpg.energy.CoalInventoryRegressionTest
+"$JAVA_HOME/bin/java" -cp "$dir:$cp" com.nexusrpg.energy.CoalUnknownRootTest
