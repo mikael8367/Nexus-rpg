@@ -111,3 +111,12 @@ item.nexusrpg.waterbreathing_staff.name=Water Breathing Staff
 tooltip.nexusrpg.magic.flameward=Fire resistance for 30 seconds
 tooltip.nexusrpg.magic.nightvision=Night vision for 60 seconds
 tooltip.nexusrpg.magic.waterbreathing=Water breathing for 30 seconds
+
+key.nexusrpg.anim.slash=Horizontal slash
+key.nexusrpg.anim.overhead=Overhead strike
+key.nexusrpg.anim.thrust=Thrust
+key.nexusrpg.anim.roll=Visual roll
+key.nexusrpg.anim.guard=Visual guard (hold)
+key.nexusrpg.anim.drink=Drink potion (visual)
+key.nexusrpg.anim.stun=Visual stun
+key.nexusrpg.anim.victory=Visual victory

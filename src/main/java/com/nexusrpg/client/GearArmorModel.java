@@ -14,6 +14,7 @@ public final class GearArmorModel extends ModelBiped {
     private static final Map<String, GearArmorModel> MODELS = new HashMap<>();
     private final int reliefU;
     private final int reliefV;
+    private boolean poseWasApplied;
 
     private GearArmorModel(String tier, EntityEquipmentSlot slot) {
         super(slot == EntityEquipmentSlot.LEGS ? 0.5F : 1.0F);
@@ -68,6 +69,25 @@ public final class GearArmorModel extends ModelBiped {
         if (slot == EntityEquipmentSlot.FEET) {
             bipedRightLeg.showModel = true;
             bipedLeftLeg.showModel = true;
+        }
+    }
+
+    @Override
+    public void setRotationAngles(float limbSwing, float limbSwingAmount, float ageInTicks,
+            float netHeadYaw, float headPitch, float scaleFactor, net.minecraft.entity.Entity entity) {
+        if (poseWasApplied) com.nexusrpg.client.anim.PlayerPose.resetPoints(this, 2F);
+        poseWasApplied = false;
+        super.setRotationAngles(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, scaleFactor, entity);
+        // Só anima a armadura quando o mesmo renderizador também anima o corpo.
+        if (!(entity instanceof net.minecraft.client.entity.AbstractClientPlayer)) return;
+        net.minecraft.client.renderer.entity.Render<?> renderer = net.minecraft.client.Minecraft.getMinecraft()
+            .getRenderManager().getEntityRenderObject(entity);
+        if (!(renderer instanceof com.nexusrpg.client.anim.RenderPlayerAnim)) return;
+        com.nexusrpg.client.anim.PlayerAnim anim = com.nexusrpg.client.anim.PlayerAnimManager.get(entity, ageInTicks);
+        if (anim != null) {
+            com.nexusrpg.client.anim.PlayerPose.apply(this, anim, com.nexusrpg.client.anim.PlayerAnimManager.time(entity, ageInTicks));
+            copyModelAngles(bipedHead, bipedHeadwear);
+            poseWasApplied = true;
         }
     }
 

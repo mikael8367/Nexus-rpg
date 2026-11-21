@@ -31,6 +31,7 @@ public class NexusRpg {
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         logger = event.getModLog();
+        if (net.minecraftforge.fml.common.FMLCommonHandler.instance().getSide() == net.minecraftforge.fml.relauncher.Side.CLIENT) initPlayerAnimations();
         NexusCreativeTab.init();
         CompassNetwork.init();
         com.nexusrpg.character.CharacterNetwork.init();
@@ -58,8 +59,15 @@ public class NexusRpg {
         CompassNetwork.clearJobs();
     }
 
+    @net.minecraftforge.fml.relauncher.SideOnly(net.minecraftforge.fml.relauncher.Side.CLIENT)
+    private static void initPlayerAnimations() { com.nexusrpg.client.anim.PlayerAnimClient.init(); }
+
+    @net.minecraftforge.fml.relauncher.SideOnly(net.minecraftforge.fml.relauncher.Side.CLIENT)
+    private static void installPlayerAnimationRenderers() { com.nexusrpg.client.anim.PlayerAnimClient.installRenderers(); }
+
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
+        if (net.minecraftforge.fml.common.FMLCommonHandler.instance().getSide() == net.minecraftforge.fml.relauncher.Side.CLIENT) installPlayerAnimationRenderers();
         logger.info("Nexus RPG: carregado!");
     }
 }
