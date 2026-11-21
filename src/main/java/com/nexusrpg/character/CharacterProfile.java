@@ -64,7 +64,7 @@ public final class CharacterProfile {
     public static int intelligence(EntityPlayer p) { return stat(p,"intelligence"); }
     public static int points(EntityPlayer p) { return p==null?0:Math.max(0,root(p).getInteger("points")); }
     public static int xp(EntityPlayer p) { return p==null?0:Math.max(0,root(p).getInteger("xp")); }
-    public static int xpForNextLevel(EntityPlayer p) { return (int)Math.min(Integer.MAX_VALUE,100L+30L*(level(p)-1)); }
+    public static int xpForNextLevel(EntityPlayer p) { return CharacterProgress.required(level(p)); }
     public static int maxMana(EntityPlayer p) { return characterClass(p).isEmpty()?0:100+stat(p,"mana")*10+intelligence(p)*5; }
     public static int mana(EntityPlayer p) { return p==null?0:Math.max(0,Math.min(maxMana(p),root(p).getInteger("mana"))); }
     /** Consume mana atomically on server thread; false on client, invalid cost or insufficient mana. */
@@ -86,9 +86,9 @@ public final class CharacterProfile {
     /** Adds combat XP; does nothing on client, unselected class or nonpositive amount. */
     public static void addXp(EntityPlayer p,int amount) {
         if(!server(p)||amount<=0||characterClass(p).isEmpty()) return;
-        NBTTagCompound n=root(p); long total=(long)xp(p)+amount; int l=level(p); int pts=points(p);
-        while(l<1000000) { long need=100L+30L*(l-1); if(total<need) break; total-=need; l++; pts=(int)Math.min(Integer.MAX_VALUE,(long)pts+3); }
-        n.setInteger("level",l); n.setInteger("points",pts); n.setInteger("xp",(int)Math.min(Integer.MAX_VALUE,total)); sync(p);
+        NBTTagCompound n=root(p);
+        CharacterProgress.Result result=CharacterProgress.advance(level(p),xp(p),points(p),amount);
+        n.setInteger("level",result.level); n.setInteger("points",result.points); n.setInteger("xp",result.xp); sync(p);
     }
     static void regenerate(EntityPlayer p) {
         if(!server(p)||characterClass(p).isEmpty()||p.isDead) return;
