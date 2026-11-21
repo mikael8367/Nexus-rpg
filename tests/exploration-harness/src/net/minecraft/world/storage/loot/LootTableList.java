@@ -1,0 +1,1 @@
+package net.minecraft.world.storage.loot; public class LootTableList { public static final net.minecraft.util.ResourceLocation CHESTS_SIMPLE_DUNGEON = new net.minecraft.util.ResourceLocation("minecraft","chests/simple_dungeon"); }
