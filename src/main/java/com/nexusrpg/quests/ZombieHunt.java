@@ -40,7 +40,7 @@ public final class ZombieHunt {
     }
     @SubscribeEvent public static void clone(PlayerEvent.Clone e) {
         if(e.getEntityPlayer().world.isRemote) return;
-        CharacterEvents.cloneSection(e.getOriginal().getEntityData(),e.getEntityPlayer().getEntityData(),HuntData.KEY);
+        HuntData.cloneProgress(e.getOriginal().getEntityData(),e.getEntityPlayer().getEntityData());
     }
     @SubscribeEvent public static void login(net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent e) {
         if(e.player.world.isRemote) return;
