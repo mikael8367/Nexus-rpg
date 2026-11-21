@@ -18,26 +18,100 @@ public final class CharacterEvents {
     private CharacterEvents() {}
     @SubscribeEvent public static void clonePlayer(PlayerEvent.Clone e) {
         if(e.getEntityPlayer().world.isRemote) return;
-        // Do not replace a destination profile with an absent or malformed source.
-        net.minecraft.nbt.NBTTagCompound data=e.getOriginal().getEntityData();
-        net.minecraft.nbt.NBTTagCompound destination=e.getEntityPlayer().getEntityData();
-        String persistedKey=EntityPlayer.PERSISTED_NBT_TAG;
-        if(data.hasKey(persistedKey,10)) {
-            net.minecraft.nbt.NBTTagCompound persisted=data.getCompoundTag(persistedKey);
-            if(persisted.hasKey(CharacterProfile.KEY,10)) {
-                CharacterProfile.replace(e.getEntityPlayer(),persisted.getCompoundTag(CharacterProfile.KEY));
-            } else if(persisted.hasKey(CharacterProfile.KEY)) {
-                // Preserve malformed raw profile data where the destination has none.
-                if(!destination.hasKey(persistedKey)) destination.setTag(persistedKey,new net.minecraft.nbt.NBTTagCompound());
-                if(destination.hasKey(persistedKey,10)) {
-                    net.minecraft.nbt.NBTTagCompound destPersisted=destination.getCompoundTag(persistedKey);
-                    if(!destPersisted.hasKey(CharacterProfile.KEY)) destPersisted.setTag(CharacterProfile.KEY,persisted.getTag(CharacterProfile.KEY).copy());
-                }
-            }
-        } else if(data.hasKey(persistedKey) && !destination.hasKey(persistedKey)) {
-            destination.setTag(persistedKey,data.getTag(persistedKey).copy());
-        }
+        cloneSection(e.getOriginal().getEntityData(), e.getEntityPlayer().getEntityData(), CharacterProfile.KEY);
         CharacterProfile.apply(e.getEntityPlayer());
+    }
+
+    // Recovery documentation: a player save's ForgeData contains append-only
+    // NexusRpgCloneBackup_v1_<number> compounds: version, section, reason, original,
+    // destination. For malformed_persisted the snapshots are whole PlayerPersisted
+    // tags; for malformed_destination_persisted original is the section and
+    // destination is the whole malformed PlayerPersisted. Other reasons contain
+    // whole section snapshots. Legacy death_combo_reset has only original. Types, unknown
+    // nested data and pre-existing backup keys are retained; do not merge trees or
+    // points automatically. To recover, make a separate full world backup, inspect
+    // the player's snapshots, then choose the appropriate complete section by hand.
+    // There is no in-game recovery UI. Both handlers carry these entries forward,
+    // including when PlayerPersisted is malformed; ForgeData is saved by Forge.
+    private static final String BACKUP_PREFIX="NexusRpgCloneBackup_v1_";
+    private static String freeBackupKey(net.minecraft.nbt.NBTTagCompound root) {
+        for (long i=0; i<Long.MAX_VALUE; i++) {
+            String key=BACKUP_PREFIX+i;
+            if (!root.hasKey(key)) return key;
+        }
+        throw new IllegalStateException("No free Nexus clone backup key");
+    }
+    public static void carryCloneBackups(net.minecraft.nbt.NBTTagCompound oldRoot, net.minecraft.nbt.NBTTagCompound root) {
+        for (String key : oldRoot.getKeySet()) {
+            if (!key.startsWith(BACKUP_PREFIX)) continue;
+            net.minecraft.nbt.NBTBase value=oldRoot.getTag(key);
+            if (!root.hasKey(key)) root.setTag(key,value.copy());
+            else if (!root.getTag(key).equals(value)) {
+                boolean found=false;
+                for (String existing : root.getKeySet())
+                    if (existing.startsWith(BACKUP_PREFIX) && root.getTag(existing).equals(value)) { found=true; break; }
+                if (!found) root.setTag(freeBackupKey(root),value.copy());
+            }
+        }
+    }
+    public static void backupClone(net.minecraft.nbt.NBTTagCompound root, String section, String reason,
+            net.minecraft.nbt.NBTBase original, net.minecraft.nbt.NBTBase destination) {
+        net.minecraft.nbt.NBTTagCompound record=new net.minecraft.nbt.NBTTagCompound();
+        record.setInteger("version",1); record.setString("section",section); record.setString("reason",reason);
+        if (original!=null) record.setTag("original",original.copy());
+        if (destination!=null) record.setTag("destination",destination.copy());
+        // Replayed clone events must not keep appending the same recovery record.
+        // Leave all pre-existing keys, even malformed or duplicate ones, untouched.
+        for (String key : root.getKeySet())
+            if (key.startsWith(BACKUP_PREFIX) && record.equals(root.getTag(key))) return;
+        root.setTag(freeBackupKey(root),record);
+    }
+    /** Copy one complete section; true only if a compound from the original became active.
+     * Conflicting snapshots are never merged: the original is authoritative on clone,
+     * except when either side is malformed, when the destination stays untouched. */
+    public static boolean cloneSection(net.minecraft.nbt.NBTTagCompound oldRoot, net.minecraft.nbt.NBTTagCompound root, String section) {
+        carryCloneBackups(oldRoot,root);
+        String key=EntityPlayer.PERSISTED_NBT_TAG;
+        if (!oldRoot.hasKey(key)) return false;
+        if (!oldRoot.hasKey(key,10)) {
+            if (!root.hasKey(key)) root.setTag(key,oldRoot.getTag(key).copy());
+            else if (!oldRoot.getTag(key).equals(root.getTag(key)))
+                backupClone(root,section,"malformed_persisted",oldRoot.getTag(key),root.getTag(key));
+            return false;
+        }
+        net.minecraft.nbt.NBTTagCompound oldPersisted=oldRoot.getCompoundTag(key);
+        if (!oldPersisted.hasKey(section)) return false;
+        if (root.hasKey(key) && !root.hasKey(key,10)) {
+            backupClone(root,section,"malformed_destination_persisted",oldPersisted.getTag(section),root.getTag(key));
+            return false;
+        }
+        if (!root.hasKey(key)) root.setTag(key,new net.minecraft.nbt.NBTTagCompound());
+        net.minecraft.nbt.NBTTagCompound persisted=root.getCompoundTag(key);
+        net.minecraft.nbt.NBTBase original=oldPersisted.getTag(section), destination=persisted.getTag(section);
+        if (destination==null) {
+            persisted.setTag(section,original.copy());
+            return original.getId()==10;
+        }
+        if (original.equals(destination)) return original.getId()==10;
+        if (original.getId()!=10 || destination.getId()!=10) {
+            backupClone(root,section,"malformed_section",original,destination);
+            return false;
+        }
+        net.minecraft.nbt.NBTTagCompound source=(net.minecraft.nbt.NBTTagCompound)original;
+        net.minecraft.nbt.NBTTagCompound target=(net.minecraft.nbt.NBTTagCompound)destination;
+        if (source.getKeySet().isEmpty() && !target.getKeySet().isEmpty()) return false;
+        if (!target.getKeySet().isEmpty()) backupClone(root,section,"conflicting_snapshots",source,target);
+        persisted.setTag(section,source.copy());
+        return true;
+    }
+    static boolean hasProtectedProfile(net.minecraft.nbt.NBTTagCompound destination) {
+        String key=EntityPlayer.PERSISTED_NBT_TAG;
+        if(!destination.hasKey(key)) return false;
+        if(!destination.hasKey(key,10)) return true;
+        net.minecraft.nbt.NBTTagCompound persisted=destination.getCompoundTag(key);
+        if(!persisted.hasKey(CharacterProfile.KEY)) return false;
+        return !persisted.hasKey(CharacterProfile.KEY,10)
+            || !persisted.getCompoundTag(CharacterProfile.KEY).getKeySet().isEmpty();
     }
     @SubscribeEvent public static void login(net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent e) { ready(e.player); }
     @SubscribeEvent public static void respawn(net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerRespawnEvent e) { ready(e.player); }
