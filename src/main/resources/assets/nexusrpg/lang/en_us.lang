@@ -171,3 +171,12 @@ item.nexusrpg.divers_reserve.name=Diver’s Reserve
 tooltip.nexusrpg.expedition.dive=Underwater: water breathing for 30 s.
 item.nexusrpg.lantern_dust.name=Lantern Dust
 tooltip.nexusrpg.expedition.sight=Night vision for 30 s.
+
+key.nexusrpg.anim.slash=Horizontal slash
+key.nexusrpg.anim.overhead=Overhead strike
+key.nexusrpg.anim.thrust=Thrust
+key.nexusrpg.anim.roll=Visual roll
+key.nexusrpg.anim.guard=Visual guard (hold)
+key.nexusrpg.anim.drink=Drink potion (visual)
+key.nexusrpg.anim.stun=Visual stun
+key.nexusrpg.anim.victory=Visual victory
