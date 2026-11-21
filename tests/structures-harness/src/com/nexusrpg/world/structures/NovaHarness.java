@@ -4,7 +4,7 @@ import com.nexusrpg.init.*; import net.minecraft.world.*; import net.minecraft.w
 public class NovaHarness {
  static int[] first={0,7,14,20,26,32,38,44}, count={7,7,6,6,6,6,6,6};
  static Biome[] bs={ModBiomes.ENCHANTED_GROVE,ModBiomes.FROST_CROWN,ModBiomes.SUNKEN_EMPIRE,ModBiomes.WITCHING_MIRE,ModBiomes.CINDER_HEART,ModBiomes.ROSA_SANCTUM,ModBiomes.UMBRAL_REACH,ModBiomes.TITAN_CANOPY};
- static class Pick extends Random {int choice, calls;Pick(int c){choice=c;}public int nextInt(int n){if(calls++==0){ok(n==8,"candidate chance");return 0;}ok(choice<n,"choice bound");return choice;}public long nextLong(){return 42;}}
+ static class Pick extends Random {int choice, calls;Pick(int c){choice=c;}public int nextInt(int n){if(calls++==0){ok(n==4,"candidate chance");return 0;}ok(choice<n,"choice bound");return choice;}public long nextLong(){return 42;}}
  static void ok(boolean b,String s){if(!b)throw new AssertionError(s);}
  static void build(Map<BlockPos,IBlockState> p,int id,int style){if(id<=16)NovaStructuresA.build(p,8,64,8,id,style);else if(id<=33)NovaStructuresB.build(p,8,64,8,id,style);else NovaStructuresC.build(p,8,64,8,id,style);}
  static void generate(Chunk c, World w, int choice){new NexusStructureGenerator().generate(new Pick(choice),c.x,c.z,w,null,(x,z)->x==c.x&&z==c.z?c:null);}
@@ -55,10 +55,10 @@ public class NovaHarness {
   Chunk saved=new Chunk(0,0,bs[0],64);saved.overlay.put(new BlockPos(5,30,5),Blocks.LOG.getDefaultState());World sw=new World(saved);generate(saved,sw,1);ok(sw.writes.isEmpty(),"modified terrain");
   Chunk disk=new Chunk(0,0,bs[0],64); World dw=new World(disk); NexusStructureGenerator dg=new NexusStructureGenerator(); dg.onChunkDataLoad(new net.minecraftforge.event.world.ChunkDataEvent.Load(dw,disk)); dg.generate(new Pick(1),0,0,dw,null,(x,z)->disk); ok(dw.writes.isEmpty(),"disk chunk");
   Chunk border=new Chunk(0,0,bs[0],64);World bw=new World(border);bw.border=false;generate(border,bw,1);ok(bw.writes.isEmpty(),"world border");
-  // Candidate outcomes: 0 attempts and 1..7 skip; dimensions, client, biome, unloaded chunk.
-  for(int roll=1;roll<8;roll++){
+  // Candidate outcomes: 0 attempts and 1..3 skip; dimensions, client, biome, unloaded chunk.
+  for(int roll=1;roll<4;roll++){
     final int r=roll;Chunk c=new Chunk(0,0,bs[0],64);World w=new World(c);
-    new NexusStructureGenerator().generate(new Random(){public int nextInt(int n){ok(n==8,"wrong chance");return r;}},0,0,w,null,(x,z)->c);
+    new NexusStructureGenerator().generate(new Random(){public int nextInt(int n){ok(n==4,"wrong chance");return r;}},0,0,w,null,(x,z)->c);
     ok(w.writes.isEmpty(),"chance skip "+roll);
   }
   Chunk dim=new Chunk(0,0,bs[0],64);World dimWorld=new World(dim);dimWorld.provider.dim=-1;generate(dim,dimWorld,1);ok(dimWorld.writes.isEmpty(),"nether");
