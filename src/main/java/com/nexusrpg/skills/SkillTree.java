@@ -29,9 +29,9 @@ public final class SkillTree {
     static {
         Map<String,Node> n=new LinkedHashMap<>();
         addClass(n,"warrior","Guerreiro","Ímpeto de guerra","+3% de dano por grau na passiva corpo a corpo.","Golpe reforçado","+1 de dano por grau na ativa.","Bastião de guerra","+2 de dano e 2 segundos de resistência na suprema por grau.");
-        addClass(n,"mage","Mago","Estudo arcano","+3% de dano por grau quando a passiva de inteligência se aplica.","Concentração arcana","+1 de dano por grau na ativa.","Ascensão arcana","+2 de dano e 2 segundos de regeneração na suprema por grau.");
+        addClass(n,"mage","Mago","Estudo arcano","+3% de dano por grau quando a passiva de inteligência se aplica.","Concentração arcana","+1 de dano por grau na ativa. !skill fire causa dano de fogo sem incendiar.","Ascensão arcana","+2 de dano e 2 segundos de regeneração na suprema por grau.");
         addClass(n,"archer","Arqueiro","Olho certeiro","+3% de dano por grau em projéteis contra hostis.","Flecha veloz","+1 de dano por grau na ativa.","Tempestade de flechas","+2 de dano e 2 segundos de velocidade na suprema por grau.");
-        addClass(n,"assassin","Assassino","Oportunismo","+3% de dano por grau na passiva contra hostis com pouca vida.","Lâmina precisa","+1 de dano por grau na ativa.","Véu mortal","+2 de dano e 2 segundos de invisibilidade na suprema por grau.");
+        addClass(n,"assassin","Assassino","Oportunismo","+3% de dano por grau contra hostis com pouca vida. Esquiva inata: 15% contra ataques comuns hostis; recarga de 400 ticks após sucesso. Não bloqueia fogo, magia, explosões ou dano ambiental.","Lâmina precisa","+1 de dano por grau na ativa.","Véu mortal","+2 de dano e 2 segundos de invisibilidade na suprema por grau.");
         addClass(n,"paladin","Paladino","Luz punitiva","+3% de dano por grau na passiva contra mortos-vivos hostis.","Bênção vital","+1 de cura por grau na ativa.","Santuário","+2 de cura e 2 segundos de resistência na suprema por grau.");
         addClass(n,"necromancer","Necromante","Roubo de vida","+0,5 de cura por grau na passiva de roubo de vida.","Dreno sombrio","+1 de dano e 0,5 de cura por grau na ativa.","Colheita de almas","+2 de dano por grau e 1 de cura por grau na suprema.");
         NODES=Collections.unmodifiableMap(n);
