@@ -14,6 +14,7 @@ import net.minecraftforge.fml.relauncher.Side;
 public final class EnergyModels {
     private EnergyModels() {}
     @SubscribeEvent public static void models(ModelRegistryEvent event) {
+        ModelLoader.setCustomModelResourceLocation(BlockPowerMachine.COAL_RECOVERY, 0, new ModelResourceLocation(BlockPowerMachine.COAL_RECOVERY.getRegistryName(), "inventory"));
         for (Block block : new Block[]{EnergyRegistry.SOLAR_PANEL, EnergyRegistry.COAL_GENERATOR, EnergyRegistry.CABLE, EnergyRegistry.MINER}) {
             ModelLoader.setCustomModelResourceLocation(Item.getItemFromBlock(block), 0, new ModelResourceLocation(block.getRegistryName(), "inventory"));
         }

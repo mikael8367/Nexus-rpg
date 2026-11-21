@@ -31,6 +31,7 @@ public final class EnergyRegistry {
     }
     @SubscribeEvent
     public static void items(RegistryEvent.Register<Item> event) {
+        event.getRegistry().register(BlockPowerMachine.COAL_RECOVERY);
         for (Block block : new Block[]{SOLAR_PANEL, COAL_GENERATOR, CABLE, MINER}) {
             event.getRegistry().register(new ItemBlock(block).setRegistryName(block.getRegistryName()));
         }
