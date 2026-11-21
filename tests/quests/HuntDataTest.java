@@ -46,6 +46,19 @@ public final class HuntDataTest {
         before=bad.copy(); check(HuntData.status(bad)==-1 && !HuntData.record(bad,first) && bad.equals(before),"wrong list untouched");
         section.setInteger("version",99); before=bad.copy();
         check(HuntData.status(bad)==-1 && !HuntData.start(bad) && bad.equals(before),"future version untouched");
+        NBTTagCompound future=root.copy();
+        future.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG).getCompoundTag(HuntData.KEY).setString("extension", "keep");
+        before=future.copy();
+        check(HuntData.status(future)==-1 && !HuntData.record(future,UUID.randomUUID()) && future.equals(before),"unknown field untouched");
+        NBTTagCompound source=root.copy();
+        check(!HuntData.cloneProgress(source,future),"unsupported destination not replaced");
+        check(future.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG).equals(before.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG)),"clone keeps unsupported destination");
+        boolean found=false;
+        for(String key:future.getKeySet()) if(key.startsWith("NexusRpgCloneBackup_v1_")) found=true;
+        check(found,"conflicting source backed up");
+        NBTTagCompound reverse=root.copy(); before=reverse.copy();
+        check(!HuntData.cloneProgress(future,reverse),"unsupported source does not replace valid destination");
+        check(reverse.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG).equals(before.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG)),"valid destination retained");
         check("keep".equals(root.getString("other")),"other data preserved");
         System.out.println("HuntDataTest passed");
     }
