@@ -33,13 +33,15 @@ public final class SkillEvents {
     private static final String[] CLASSES = {"warrior", "mage", "archer", "assassin", "paladin", "necromancer"};
     private SkillEvents() {}
 
-    private static NBTTagCompound data(EntityPlayer p) {
+    static NBTTagCompound data(EntityPlayer p) {
         NBTTagCompound root = p.getEntityData();
-        NBTTagCompound persisted = root.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG);
-        root.setTag(EntityPlayer.PERSISTED_NBT_TAG, persisted);
-        NBTTagCompound skills = persisted.getCompoundTag(KEY);
-        persisted.setTag(KEY, skills);
-        return skills;
+        String key = EntityPlayer.PERSISTED_NBT_TAG;
+        if (root.hasKey(key) && !root.hasKey(key, 10)) return null;
+        if (!root.hasKey(key)) root.setTag(key, new NBTTagCompound());
+        NBTTagCompound persisted = root.getCompoundTag(key);
+        if (persisted.hasKey(KEY) && !persisted.hasKey(KEY, 10)) return null;
+        if (!persisted.hasKey(KEY)) persisted.setTag(KEY, new NBTTagCompound());
+        return persisted.getCompoundTag(KEY);
     }
     private static boolean known(String name) {
         for (String c : CLASSES) if (c.equals(name)) return true;
@@ -47,9 +49,7 @@ public final class SkillEvents {
     }
     private static int rank(NBTTagCompound d, String c) { return Math.max(0, Math.min(5, d.getInteger("rank_" + c))); }
     private static int points(NBTTagCompound d, int level) {
-        int earned = (Math.max(1, level) - 1) / 3;
-        for (String c : CLASSES) earned -= rank(d, c);
-        return Math.max(0, earned);
+        return SkillTreeService.available(d, level);
     }
     private static long now(EntityPlayerMP p) {
         WorldServer overworld = p.getServer().getWorld(0);
@@ -98,7 +98,7 @@ public final class SkillEvents {
             && target != null && target.getUniqueID().toString().equals(d.getString("combo_target_" + c));
     }
     private static void mark(NBTTagCompound d, String c, EntityLivingBase target, long tick) {
-        d.setLong("combo_start_" + c, tick); d.setLong("combo_until_" + c, tick + 120);
+        d.setLong("combo_start_" + c, tick); d.setLong("combo_until_" + c, SkillTreeService.deadline(tick, 120));
         d.setString("combo_target_" + c, target.getUniqueID().toString());
     }
 
@@ -111,30 +111,50 @@ public final class SkillEvents {
         EntityPlayerMP p = event.getPlayer();
         if (p.world.isRemote || !p.isEntityAlive() || p.isSpectator()) return;
         String[] args = raw.toLowerCase(java.util.Locale.ROOT).split("\\s+");
-        if (args.length > 2) { say(p, "Use !skill info, !skill up, !skill cast ou !skill ultimate."); return; }
+        if (args.length > 3 || (args.length == 3 && !"up".equals(args[1]))) { say(p, "Use !skill info, !skill tree, !skill up [id], !skill cast ou !skill ultimate."); return; }
         String cmd = args.length == 1 ? "info" : args[1];
         String c = CharacterProfile.characterClass(p);
         if (!known(c)) { say(p, "Escolha uma classe no sistema de personagem primeiro."); return; }
         NBTTagCompound d = data(p);
+        if (d == null) { say(p, "Dados de habilidades incompatíveis; nada foi alterado."); return; }
         int level = Math.max(1, CharacterProfile.level(p));
         int r = rank(d, c);
-        if ("info".equals(cmd)) {
-            say(p, "Classe: " + c + "; nivel: " + level + "; aperfeicoamento: " + r + "/5; pontos livres: " + points(d, level) + ". Suprema no nivel 15.");
-            say(p, "!skill cast = ativa; !skill ultimate = suprema; !skill up = gastar ponto.");
+        if ("info".equals(cmd) || "tree".equals(cmd)) {
+            NBTTagCompound snapshot=SkillTreeService.snapshot(p);
+            if (!snapshot.getBoolean("ok")) { say(p, snapshot.getString("reason")); return; }
+            say(p, "Classe: " + c + "; nível: " + level + "; aperfeiçoamento: " + r + "/5; pontos livres: " + snapshot.getInteger("points") + ". Suprema no nível 15.");
+            if ("tree".equals(cmd)) for (SkillTree.Node node:SkillTree.nodes(c)) {
+                say(p, node.id + " — " + node.name + " " + SkillTreeService.rank(d,node) + "/" + node.maxRank + ", custo " + node.cost + ": " + node.description);
+            }
+            else say(p, "!skill tree = árvore; !skill up [id] = gastar ponto(s); !skill cast/ultimate = usar.");
             return;
         }
         if ("up".equals(cmd)) {
-            if (r >= 5) { say(p, "Aperfeicoamento desta classe ja esta no maximo."); return; }
-            if (points(d, level) == 0) { say(p, "Sem pontos. Ganhe um a cada tres niveis, a partir do nivel 4."); return; }
-            d.setInteger("rank_" + c, r + 1); say(p, "Aperfeicoamento: " + (r + 1) + "/5."); return;
+            String id=args.length==3 ? args[2] : c+".training";
+            String result=SkillTreeService.allocate(p,id);
+            say(p,result.isEmpty()?"Habilidade aprimorada: " + id + ".":result);
+            return;
         }
         boolean ultimate = "ultimate".equals(cmd);
         if (!ultimate && !"cast".equals(cmd)) { say(p, "Use !skill info, !skill up, !skill cast ou !skill ultimate."); return; }
+        SkillTreeService.activate(p, ultimate);
+    }
+
+    // Entrada interna: somente chamada por SkillTreeService após checagem do servidor.
+    static void activateServer(EntityPlayerMP p, boolean ultimate) {
+        String c=CharacterProfile.characterClass(p);
+        NBTTagCompound d=data(p);
+        if (!known(c) || d==null) { say(p, "Dados de habilidades indisponíveis."); return; }
+        if (!SkillTreeService.runtimeValid(d)) { say(p, "Dados de habilidades incompatíveis; nada foi alterado."); return; }
+        int level=CharacterProfile.level(p), r=rank(d,c);
         if (ultimate && level < 15) { say(p, "A suprema exige nivel 15."); return; }
         long tick = now(p);
+        if (tick < 0 || tick > Long.MAX_VALUE - (ultimate ? 1200 : 160)) {
+            say(p, "Relógio do mundo inválido; nada foi alterado."); return;
+        }
         String timer = (ultimate ? "ultimate_" : "cast_") + c;
         long ready = d.getLong(timer);
-        if (ready > tick) { say(p, "Recarga: " + ((ready - tick + 19) / 20) + " s."); return; }
+        if (ready > tick) { say(p, "Recarga: " + SkillTreeService.secondsRemaining(ready, tick) + " s."); return; }
         EntityLivingBase target = null;
         List<EntityLivingBase> targets = null;
         if (!"paladin".equals(c)) {
@@ -148,18 +168,21 @@ public final class SkillEvents {
         }
         int cost = ultimate ? 30 : 10;
         if (!CharacterProfile.consumeMana(p, cost)) { say(p, "Mana insuficiente (necessario: " + cost + ")."); return; }
-        d.setLong(timer, tick + (ultimate ? 1200 : 160));
+        d.setLong(timer, SkillTreeService.deadline(tick, ultimate ? 1200 : 160));
         int intelligence = Math.max(0, Math.min(100, CharacterProfile.intelligence(p)));
-        float power = 4.0F + r + Math.min(5.0F, intelligence * 0.05F);
+        boolean treeValid = SkillTreeService.valid(d);
+        int activeRank = treeValid ? SkillTreeService.rank(d, SkillTree.node(c + ".active")) : 0;
+        int ultimateRank = treeValid ? SkillTreeService.rank(d, SkillTree.node(c + ".ultimate")) : 0;
+        float power = 4.0F + r + Math.min(5.0F, intelligence * 0.05F) + (ultimate ? ultimateRank * 2 : activeRank);
         if ("paladin".equals(c)) {
             if (ultimate) {
                 boolean chained = tick >= d.getLong("pal_combo_start") && tick <= d.getLong("pal_combo_until") && d.getLong("pal_combo_until") > 0;
-                p.heal((chained ? 10 : 7) + r);
-                buff(p, MobEffects.RESISTANCE, 200, 1);
+                p.heal((chained ? 10 : 7) + r + ultimateRank * 2);
+                buff(p, MobEffects.RESISTANCE, 200 + 40 * ultimateRank, 1);
                 d.setLong("pal_combo_until", 0);
             } else {
-                p.heal(2 + r * 0.5F); buff(p, MobEffects.RESISTANCE, 100, 0);
-                d.setLong("pal_combo_start", tick); d.setLong("pal_combo_until", tick + 120);
+                p.heal(2 + r * 0.5F + activeRank); buff(p, MobEffects.RESISTANCE, 100, 0);
+                d.setLong("pal_combo_start", tick); d.setLong("pal_combo_until", SkillTreeService.deadline(tick, 120));
             }
         } else if (!ultimate) {
             damage(p, target, power);
@@ -168,7 +191,7 @@ public final class SkillEvents {
             if ("mage".equals(c)) buff(p, MobEffects.RESISTANCE, 60, 0);
             else if ("archer".equals(c)) buff(p, MobEffects.SPEED, 80, 0);
             else if ("assassin".equals(c)) buff(p, MobEffects.INVISIBILITY, 60, 0);
-            else if ("necromancer".equals(c)) p.heal(2);
+            else if ("necromancer".equals(c)) p.heal(2 + activeRank * 0.5F);
             else buff(p, MobEffects.STRENGTH, 60, 0);
             mark(d, c, target, tick);
         } else {
@@ -177,21 +200,26 @@ public final class SkillEvents {
                 boolean chained = combo(d, c, e, tick);
                 damage(p, e, power + 4 + (chained ? 3 : 0));
             }
-            if ("warrior".equals(c)) buff(p, MobEffects.RESISTANCE, 120, 0);
-            else if ("mage".equals(c)) buff(p, MobEffects.REGENERATION, 100, 0);
-            else if ("archer".equals(c)) buff(p, MobEffects.SPEED, 160, 1);
-            else if ("assassin".equals(c)) buff(p, MobEffects.INVISIBILITY, 100, 0);
-            else if ("necromancer".equals(c)) p.heal(Math.min(6, targets.size() * 2));
+            if ("warrior".equals(c)) buff(p, MobEffects.RESISTANCE, 120 + 40 * ultimateRank, 0);
+            else if ("mage".equals(c)) buff(p, MobEffects.REGENERATION, 100 + 40 * ultimateRank, 0);
+            else if ("archer".equals(c)) buff(p, MobEffects.SPEED, 160 + 40 * ultimateRank, 1);
+            else if ("assassin".equals(c)) buff(p, MobEffects.INVISIBILITY, 100 + 40 * ultimateRank, 0);
+            else if ("necromancer".equals(c)) p.heal(Math.min(6, targets.size() * 2) + ultimateRank);
             d.setLong("combo_until_" + c, 0);
         }
         say(p, ultimate ? "Suprema ativada!" : "Habilidade ativada!");
     }
 
+    static float boostedDamage(float amount, float bonus, int training, int passive) {
+        return (float)Math.min(Float.MAX_VALUE,
+            (double)amount * (1 + bonus + training * 0.01F + passive * 0.03F));
+    }
     // All passive combat bonuses are applied only to hostile mobs, never PvP or allies.
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = false)
     public static void hurt(LivingHurtEvent event) {
         Entity source = event.getSource().getTrueSource();
-        if (!(source instanceof EntityPlayerMP) || event.getEntityLiving().world.isRemote || !(event.getAmount() > 0)) return;
+        if (!(source instanceof EntityPlayerMP) || event.getEntityLiving().world.isRemote || !(event.getAmount() > 0)
+            || Float.isInfinite(event.getAmount()) || Float.isNaN(event.getAmount())) return;
         EntityPlayerMP p = (EntityPlayerMP) source;
         if (!p.isEntityAlive() || p.isSpectator()) return;
         EntityLivingBase victim = event.getEntityLiving();
@@ -199,6 +227,7 @@ public final class SkillEvents {
         String c = CharacterProfile.characterClass(p);
         if (!known(c)) return;
         NBTTagCompound d = data(p);
+        if (!SkillTreeService.runtimeValid(d)) return;
         int r = rank(d, c);
         float bonus = 0;
         if ("warrior".equals(c) && p.getDistanceSq(victim) <= 25) bonus = 0.10F;
@@ -206,22 +235,28 @@ public final class SkillEvents {
         else if ("archer".equals(c) && event.getSource().isProjectile()) bonus = 0.15F;
         else if ("assassin".equals(c) && victim.getHealth() < victim.getMaxHealth() * 0.5F) bonus = 0.15F;
         else if ("paladin".equals(c) && victim.isEntityUndead()) bonus = 0.15F;
-        if (bonus > 0) event.setAmount(event.getAmount() * (1 + bonus + r * 0.01F));
+        int passiveRank = SkillTreeService.valid(d) ? SkillTreeService.rank(d,SkillTree.node(c+".passive")) : 0;
+        if (bonus > 0) event.setAmount(boostedDamage(event.getAmount(), bonus, r, passiveRank));
     }
     // This is after armor and LivingHurtEvent cancellation, but a later listener can
     // still cancel LivingDamageEvent; Forge 1.12 has no uncancellable post-damage event.
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = false)
     public static void leech(LivingDamageEvent event) {
         Entity source = event.getSource().getTrueSource();
-        if (!(source instanceof EntityPlayerMP) || event.getEntityLiving().world.isRemote || !(event.getAmount() > 0)) return;
+        if (!(source instanceof EntityPlayerMP) || event.getEntityLiving().world.isRemote || !(event.getAmount() > 0)
+            || Float.isInfinite(event.getAmount()) || Float.isNaN(event.getAmount())) return;
         EntityPlayerMP p = (EntityPlayerMP) source;
         if (!p.isEntityAlive() || p.isSpectator() || !hostile(p, event.getEntityLiving())
             || !"necromancer".equals(CharacterProfile.characterClass(p))) return;
         NBTTagCompound d = data(p);
+        if (!SkillTreeService.runtimeValid(d)) return;
         long t = now(p);
+        if (t < 0 || t > Long.MAX_VALUE - 200) return;
         if (t >= d.getLong("leech_ready")) {
-            p.heal(1 + rank(d, "necromancer") * 0.2F);
-            d.setLong("leech_ready", t + 200);
+            int passiveRank = SkillTreeService.rank(d,SkillTree.node("necromancer.passive"));
+            // Reserve before healing: another mod may re-enter damage handling during heal.
+            d.setLong("leech_ready", SkillTreeService.deadline(t, 200));
+            p.heal(1 + rank(d, "necromancer") * 0.2F + passiveRank * 0.5F);
         }
     }
     private static void clearCombos(NBTTagCompound skills) {
@@ -233,16 +268,44 @@ public final class SkillEvents {
         skills.removeTag("pal_combo_start");
         skills.removeTag("pal_combo_until");
     }
+    // Original values win; do not lose unrelated destination fields installed by another handler.
+    static NBTTagCompound cloneSkills(NBTTagCompound original, NBTTagCompound destination, boolean death) {
+        NBTTagCompound copy = original.copy();
+        if (destination != null) {
+            for (String key : destination.getKeySet()) {
+                if (!copy.hasKey(key)) copy.setTag(key, destination.getTag(key).copy());
+                else if ("tree_v1".equals(key) && copy.hasKey(key, 10) && destination.hasKey(key, 10)) {
+                    NBTTagCompound oldTree = copy.getCompoundTag(key), newTree = destination.getCompoundTag(key);
+                    for (String node : newTree.getKeySet())
+                        if (!oldTree.hasKey(node)) oldTree.setTag(node, newTree.getTag(node).copy());
+                }
+            }
+        }
+        // Preserve malformed NBT rather than deleting recoverable tags.
+        if (death && SkillTreeService.runtimeValid(copy)) clearCombos(copy);
+        return copy;
+    }
     @SubscribeEvent
     public static void clone(PlayerEvent.Clone event) {
         if (event.getEntityPlayer().world.isRemote) return;
-        NBTTagCompound oldPersisted = event.getOriginal().getEntityData().getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG);
-        if (!oldPersisted.hasKey(KEY, 10)) return;
+        NBTTagCompound oldRoot = event.getOriginal().getEntityData();
         NBTTagCompound root = event.getEntityPlayer().getEntityData();
-        NBTTagCompound persisted = root.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG);
-        NBTTagCompound skills = oldPersisted.getCompoundTag(KEY).copy();
-        if (event.isWasDeath()) clearCombos(skills);
-        persisted.setTag(KEY, skills);
-        root.setTag(EntityPlayer.PERSISTED_NBT_TAG, persisted);
+        String key=EntityPlayer.PERSISTED_NBT_TAG;
+        if (!oldRoot.hasKey(key,10)) {
+            if(oldRoot.hasKey(key) && !root.hasKey(key)) root.setTag(key,oldRoot.getTag(key).copy());
+            return;
+        }
+        NBTTagCompound oldPersisted=oldRoot.getCompoundTag(key);
+        if (!oldPersisted.hasKey(KEY)) return;
+        if (root.hasKey(key) && !root.hasKey(key,10)) return;
+        if (!root.hasKey(key)) root.setTag(key,new NBTTagCompound());
+        NBTTagCompound persisted=root.getCompoundTag(key);
+        if (persisted.hasKey(KEY) && !persisted.hasKey(KEY,10)) return;
+        if (!oldPersisted.hasKey(KEY,10)) {
+            if (!persisted.hasKey(KEY)) persisted.setTag(KEY,oldPersisted.getTag(KEY).copy());
+            return;
+        }
+        NBTTagCompound destinationSkills = persisted.hasKey(KEY, 10) ? persisted.getCompoundTag(KEY) : null;
+        persisted.setTag(KEY, cloneSkills(oldPersisted.getCompoundTag(KEY), destinationSkills, event.isWasDeath()));
     }
 }
