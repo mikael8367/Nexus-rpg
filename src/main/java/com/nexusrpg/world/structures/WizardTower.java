@@ -22,12 +22,24 @@ public final class WizardTower {
     public static void setSpawnHandler(SpawnHandler handler) { spawnHandler = handler; }
     private WizardTower() { }
 
-    static boolean supports(int style) { return style == 0 || style == 3 || style == 6; }
+    static boolean supports(int style) { return style >= 0 && style < 8; }
 
     static void build(Map<BlockPos, IBlockState> p, int x, int y, int z, int style) {
         if (!supports(style)) throw new IllegalArgumentException("Unsupported tower biome");
-        Block wall = style == 3 ? Blocks.MOSSY_COBBLESTONE : style == 6 ? Blocks.END_BRICKS : Blocks.STONEBRICK;
-        Block accent = style == 6 ? Blocks.OBSIDIAN : Blocks.COBBLESTONE;
+        // Only blocks accepted by the generator's inert-decoration allowlist.
+        // Packed ice and colored clay cannot be used without changing that safety policy.
+        Block wall, accent;
+        switch (style) {
+        case 0: wall = Blocks.STONEBRICK; accent = Blocks.COBBLESTONE; break; // Grove
+        case 1: wall = Blocks.QUARTZ_BLOCK; accent = Blocks.PRISMARINE; break; // Frost
+        case 2: wall = Blocks.SANDSTONE; accent = Blocks.BRICK_BLOCK; break; // Buried empire
+        case 3: wall = Blocks.MOSSY_COBBLESTONE; accent = Blocks.COBBLESTONE; break; // Mire
+        case 4: wall = Blocks.NETHER_BRICK; accent = Blocks.RED_NETHER_BRICK; break; // Cinder
+        case 5: wall = Blocks.QUARTZ_BLOCK; accent = Blocks.PURPUR_BLOCK; break; // Rosa
+        case 6: wall = Blocks.END_BRICKS; accent = Blocks.OBSIDIAN; break; // Umbral
+        case 7: wall = Blocks.LOG; accent = Blocks.MOSSY_COBBLESTONE; break; // Canopy
+        default: throw new IllegalArgumentException("Unsupported tower biome");
+        }
         // Square shell, with a two-block-high north doorway and narrow glazed windows.
         for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) {
             if (Math.abs(dx) != 3 && Math.abs(dz) != 3) continue;
