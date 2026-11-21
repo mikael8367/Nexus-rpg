@@ -11,6 +11,8 @@ import net.minecraftforge.items.ItemStackHandler;
 
 public final class TileCoalGenerator extends TileProducer {
     private int burnTicks;
+    // Keep anomalous legacy inventory data as an archival backup, not live items.
+    @Nullable private NBTTagCompound preservedFuelInventory;
     public final ItemStackHandler inventory = new ItemStackHandler(1) {
         @Override protected void onContentsChanged(int slot) { markDirty(); }
         @Override public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
@@ -39,23 +41,40 @@ public final class TileCoalGenerator extends TileProducer {
         return super.getCapability(capability, facing);
     }
     @Override public NBTTagCompound writeToNBT(NBTTagCompound tag) {
-        super.writeToNBT(tag); tag.setInteger("BurnTicks", burnTicks); tag.setTag("FuelInventory", inventory.serializeNBT()); return tag;
+        super.writeToNBT(tag); tag.setInteger("BurnTicks", burnTicks); tag.setTag("FuelInventory", inventory.serializeNBT());
+        if (preservedFuelInventory != null) tag.setTag("NexusRpgOriginalFuelInventory", preservedFuelInventory.copy());
+        return tag;
     }
     @Override public void readFromNBT(NBTTagCompound tag) {
         super.readFromNBT(tag); burnTicks = Math.max(0, Math.min(1600, tag.getInteger("BurnTicks")));
         inventory.setStackInSlot(0, ItemStack.EMPTY);
+        preservedFuelInventory = tag.hasKey("NexusRpgOriginalFuelInventory", 10)
+            ? tag.getCompoundTag("NexusRpgOriginalFuelInventory").copy() : null;
         if (tag.hasKey("FuelInventory", 10)) {
-            net.minecraft.nbt.NBTTagList items = tag.getCompoundTag("FuelInventory").getTagList("Items", 10);
+            NBTTagCompound original = tag.getCompoundTag("FuelInventory");
+            net.minecraft.nbt.NBTTagList items = original.getTagList("Items", 10);
+            boolean malformed = !original.hasKey("Size", 3) || original.getInteger("Size") != 1
+                || (original.hasKey("Items") && !original.hasKey("Items", 9)) || items.tagCount() > 1;
+            if (original.hasKey("Items", 9)) {
+                net.minecraft.nbt.NBTTagList raw = (net.minecraft.nbt.NBTTagList) original.getTag("Items");
+                if (raw.tagCount() > 0 && raw.getTagType() != 10) malformed = true;
+            }
+            boolean loadedSlot = false;
             for (int i = 0; i < Math.min(items.tagCount(), 64); i++) {
                 NBTTagCompound entry = items.getCompoundTagAt(i);
-                if (entry.getInteger("Slot") != 0) continue;
-                ItemStack loaded = new ItemStack(entry);
-                if (isFuel(loaded)) {
-                    loaded.setCount(Math.min(loaded.getCount(), Math.min(64, loaded.getMaxStackSize())));
-                    inventory.setStackInSlot(0, loaded);
+                if (!entry.hasKey("Slot", 3) || entry.getInteger("Slot") != 0 || loadedSlot) {
+                    malformed = true; continue;
                 }
-                break;
+                loadedSlot = true;
+                ItemStack loaded = new ItemStack(entry);
+                if (loaded.isEmpty()) { malformed = true; continue; }
+                int limit = Math.min(64, loaded.getMaxStackSize());
+                if (loaded.getCount() > limit) { malformed = true; loaded.setCount(limit); }
+                // Old saves can contain non-fuel items. Keep them extractable; new
+                // insertions remain restricted by the normal item handler.
+                inventory.setStackInSlot(0, loaded);
             }
+            if (malformed && preservedFuelInventory == null) preservedFuelInventory = original.copy();
         }
     }
 }
