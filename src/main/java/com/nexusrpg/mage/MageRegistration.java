@@ -25,6 +25,12 @@ public final class MageRegistration {
                 .name("tower_mage")
                 .tracker(64, 3, true)
                 .build());
+        event.getRegistry().register(EntityEntryBuilder.<EntityMageFireball>create()
+                .entity(EntityMageFireball.class)
+                .id(new ResourceLocation("nexusrpg", "mage_fireball"), 2)
+                .name("mage_fireball")
+                .tracker(64, 1, true)
+                .build());
     }
 
     /**
