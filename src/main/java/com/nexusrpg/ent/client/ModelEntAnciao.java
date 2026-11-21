@@ -178,102 +178,132 @@ public class ModelEntAnciao extends ModelBase {
         r.rotateAngleZ = 0F;
     }
 
+    // All attack timing comes from the common interface, in ticks plus partial ticks.
+    // Window endpoints return smoothly to zero, so shared model instances do not
+    // retain a previous entity's pose or require client-side animation counters.
+    private static float rise(float tick, float from, float to) {
+        return ease((tick - from) / (to - from));
+    }
+
+    private static float window(float tick, float inStart, float inEnd, float outStart, float outEnd) {
+        return rise(tick, inStart, inEnd) * (1F - rise(tick, outStart, outEnd));
+    }
+
     @Override
     public void setRotationAngles(float limbSwing, float limbSwingAmount, float ageInTicks,
                                   float netHeadYaw, float headPitch, float scaleFactor, Entity entityIn) {
         zero(root); zero(torso); zero(head); zero(crown);
         zero(armR); zero(armL); zero(legR); zero(legL);
+        zero(antR); zero(antL); zero(tineAR); zero(tineBR); zero(tineAL); zero(tineBL);
+        antR.rotateAngleZ = -0.35F; antL.rotateAngleZ = 0.35F;
+        tineAR.rotateAngleZ = -0.8F; tineBR.rotateAngleZ = 0.5F;
+        tineAL.rotateAngleZ = 0.8F; tineBL.rotateAngleZ = -0.5F;
         root.setRotationPoint(0F, 24F, 0F);
         glow = 1F;
 
-        float t = ageInTicks / 20F * (enraged ? 1.35F : 1F);
-        float b = MathHelper.sin(t * 1.6F);
+        float tick = Math.max(0F, animTime * 20F);
+        float wind = 0F, impact = 0F, roar = 0F, spin = 0F, fall = 0F;
+        if (animState == IEntAnciaoAnimated.SLAM) {
+            // Windup finishes at 18; fists descend through the impact at tick 22.
+            wind = window(tick, 0F, 18F, 18F, 22F);
+            impact = window(tick, 18F, 22F, 28F, 52F);
+        } else if (animState == IEntAnciaoAnimated.ROAR) {
+            roar = window(tick, 0F, 12F, 44F, 60F);
+        } else if (animState == IEntAnciaoAnimated.SPIN) {
+            spin = window(tick, 0F, 10F, 68F, 80F);
+        } else if (animState == IEntAnciaoAnimated.DEATH) {
+            fall = rise(tick, 0F, 16F);
+        }
+        float action = MathHelper.clamp(wind + impact + roar + spin + fall, 0F, 1F);
+        float walk = MathHelper.clamp(limbSwingAmount, 0F, 1F) * (1F - action);
+        float step = MathHelper.cos(limbSwing * 0.6F) * walk;
+        // Do not change phase on becoming enraged: doing so jumps the entire pose.
+        float breath = MathHelper.sin(ageInTicks * 0.08F);
+        float sway = MathHelper.sin(ageInTicks * 0.055F);
+        float idle = 1F - 0.75F * action;
+        float tension = enraged ? 1.35F : 1F;
 
-        // base: respiração e balanço
-        torso.rotateAngleX = b * 0.015F;
-        head.rotateAngleY = MathHelper.sin(t * 0.7F) * 0.2F + MathHelper.clamp(netHeadYaw, -50F, 50F) * 0.0087F;
-        head.rotateAngleX = b * 0.03F + MathHelper.clamp(headPitch, -30F, 30F) * 0.0087F;
-        armR.rotateAngleZ = 0.06F + b * 0.02F;
-        armL.rotateAngleZ = -armR.rotateAngleZ;
-        armR.rotateAngleX = MathHelper.sin(t * 1.1F) * 0.05F;
-        armL.rotateAngleX = -armR.rotateAngleX;
-        crown.rotateAngleZ = -MathHelper.sin(t * 1.3F) * 0.03F;
+        torso.rotateAngleX = breath * 0.018F * tension * idle;
+        torso.rotateAngleY = step * 0.09F;
+        torso.rotateAngleZ = step * 0.035F;
+        head.rotateAngleY = (sway * 0.10F + MathHelper.clamp(netHeadYaw, -50F, 50F) * 0.0087F) * (1F - 0.8F * spin);
+        head.rotateAngleX = breath * 0.024F * idle + MathHelper.clamp(headPitch, -30F, 30F) * 0.0087F * (1F - 0.8F * action);
+        head.rotateAngleZ = -step * 0.025F;
+        armR.rotateAngleZ = 0.06F + breath * 0.02F * idle;
+        armL.rotateAngleZ = -0.06F - breath * 0.02F * idle;
+        armR.rotateAngleX = MathHelper.sin(ageInTicks * 0.055F) * 0.05F * idle - step * 0.55F;
+        armL.rotateAngleX = -MathHelper.sin(ageInTicks * 0.055F + 0.2F) * 0.05F * idle + step * 0.55F;
+        legR.rotateAngleX = step * 0.75F;
+        legL.rotateAngleX = -step * 0.75F;
+        root.rotationPointY -= Math.abs(step) * 0.5F;
+        crown.rotateAngleZ = -sway * 0.025F;
 
-        // andar
-        float w = MathHelper.cos(limbSwing * 0.6F) * limbSwingAmount;
-        legR.rotateAngleX = w * 0.9F;
-        legL.rotateAngleX = -w * 0.9F;
-        armR.rotateAngleX -= w * 0.6F;
-        armL.rotateAngleX += w * 0.6F;
-        torso.rotateAngleY = w * 0.08F;
-        root.rotationPointY -= Math.abs(w) * 0.8F;
-
-        // cipós balançando
-        for (int i = 0; i < vines.length; i++) {
-            vines[i].rotateAngleZ = MathHelper.sin(t * 2F + i) * 0.1F;
+        // The heavy trunk leans back before both fists fall, then settles.
+        if (animState == IEntAnciaoAnimated.SLAM) {
+            float shudder = MathHelper.sin((tick - 22F) * 0.8F) * window(tick, 22F, 24F, 24F, 38F);
+            torso.rotateAngleX += -0.27F * wind + 0.42F * impact + 0.035F * shudder;
+            torso.rotateAngleY += 0.04F * wind;
+            head.rotateAngleX += -0.24F * wind + 0.24F * impact - 0.06F * shudder;
+            armR.rotateAngleX += -2.65F * wind - 1.32F * impact;
+            armL.rotateAngleX += -2.60F * wind - 1.37F * impact;
+            armR.rotateAngleZ += 0.18F * wind + 0.05F * impact;
+            armL.rotateAngleZ -= 0.15F * wind + 0.05F * impact;
+            legR.rotateAngleX += 0.14F * wind - 0.20F * impact;
+            legL.rotateAngleX += 0.11F * wind - 0.18F * impact;
+            root.rotationPointY += 1.3F * impact + 0.14F * shudder;
+            crown.rotateAngleX += 0.07F * impact - 0.09F * wind;
+        } else if (animState == IEntAnciaoAnimated.ROAR) {
+            float rumble = MathHelper.sin(tick * 0.72F) * roar;
+            torso.rotateAngleX -= 0.23F * roar;
+            head.rotateAngleX -= 0.55F * roar;
+            head.rotateAngleZ += 0.025F * rumble;
+            armR.rotateAngleX -= 0.32F * roar;
+            armL.rotateAngleX -= 0.29F * roar;
+            armR.rotateAngleZ += 0.95F * roar;
+            armL.rotateAngleZ -= 0.95F * roar;
+            legR.rotateAngleX += 0.10F * roar;
+            legL.rotateAngleX += 0.10F * roar;
+            root.rotationPointY += 0.35F * roar;
+            crown.rotateAngleZ += 0.035F * rumble;
+        } else if (animState == IEntAnciaoAnimated.SPIN) {
+            // Exactly three revolutions, ending on the original heading at tick 72.
+            float turn = rise(tick, 8F, 72F) * (float) (Math.PI * 6.0);
+            float stride = MathHelper.sin(turn * 2F) * spin;
+            root.rotateAngleY = -turn;
+            torso.rotateAngleX += 0.13F * spin;
+            torso.rotateAngleZ += 0.045F * stride;
+            head.rotateAngleX += 0.10F * spin;
+            armR.rotateAngleZ += 1.35F * spin;
+            armL.rotateAngleZ -= 1.35F * spin;
+            armR.rotateAngleX -= 0.18F * spin;
+            armL.rotateAngleX -= 0.18F * spin;
+            legR.rotateAngleX += 0.30F * stride;
+            legL.rotateAngleX -= 0.30F * stride;
+            root.rotationPointY -= Math.abs(stride) * 0.30F;
+            crown.rotateAngleZ -= 0.05F * stride;
+        } else if (animState == IEntAnciaoAnimated.DEATH) {
+            head.rotateAngleX += 0.6F * fall;
+            torso.rotateAngleX += 0.5F * fall;
+            armR.rotateAngleX += 0.3F * fall;
+            armL.rotateAngleX += 0.3F * fall;
+            armR.rotateAngleZ += 0.4F * fall;
+            armL.rotateAngleZ -= 0.4F * fall;
+            legR.rotateAngleX -= 0.3F * fall;
+            legL.rotateAngleX -= 0.3F * fall;
+            root.rotationPointY += 1.5F * fall;
+            glow = 1F - fall;
         }
 
-        float c = animTime;
-        switch (animState) {
-            case IEntAnciaoAnimated.SLAM: {
-                float a, l, h;
-                if (c < 1F) {
-                    float k = ease(c);
-                    a = -2.7F * k; l = -0.25F * k; h = -0.3F * k;
-                } else if (c < 1.2F) {
-                    float k = ease((c - 1F) / 0.2F);
-                    a = -2.7F + 2.3F * k; l = -0.25F + 0.55F * k; h = -0.3F + 0.5F * k;
-                    root.rotationPointY += 0.5F * k;
-                } else {
-                    float r = ease((c - 1.5F) / 1.1F);
-                    a = -0.4F * (1F - r); l = 0.3F * (1F - r); h = 0.2F * (1F - r);
-                }
-                armR.rotateAngleX = a;
-                armL.rotateAngleX = a;
-                armR.rotateAngleZ = 0.08F;
-                armL.rotateAngleZ = -0.08F;
-                torso.rotateAngleX = l;
-                head.rotateAngleX += h;
-                legR.rotateAngleX = -l * 0.6F;
-                legL.rotateAngleX = -l * 0.6F;
-                break;
-            }
-            case IEntAnciaoAnimated.ROAR: {
-                float k = ease(c / 0.6F) * (1F - ease((c - 2.2F) / 0.8F));
-                head.rotateAngleX += -0.6F * k;
-                torso.rotateAngleX = -0.2F * k;
-                armR.rotateAngleZ = 1.1F * k;
-                armL.rotateAngleZ = -1.1F * k;
-                root.rotationPointX = MathHelper.sin(ageInTicks * 3F) * 0.2F * k;
-                crown.rotateAngleZ += MathHelper.sin(ageInTicks * 1.5F) * 0.1F * k;
-                break;
-            }
-            case IEntAnciaoAnimated.SPIN: {
-                float k = ease(c / 0.4F) * (1F - ease((c - 3.2F) / 0.6F));
-                armR.rotateAngleZ = 1.45F * k;
-                armL.rotateAngleZ = -1.45F * k;
-                torso.rotateAngleX = 0.1F * k;
-                root.rotateAngleY = -6F * (float) Math.PI * ease(c / 3.4F);
-                legR.rotateAngleX = MathHelper.sin(t * 10F) * 0.4F * k;
-                legL.rotateAngleX = -legR.rotateAngleX;
-                break;
-            }
-            case IEntAnciaoAnimated.DEATH: {
-                float k = ease(c / 0.8F);
-                head.rotateAngleX += 0.6F * k;
-                torso.rotateAngleX = 0.5F * k;
-                armR.rotateAngleX = 0.3F * k;
-                armL.rotateAngleX = 0.3F * k;
-                armR.rotateAngleZ = 0.4F * k;
-                armL.rotateAngleZ = -0.4F * k;
-                legR.rotateAngleX = -0.3F * k;
-                legL.rotateAngleX = -0.3F * k;
-                root.rotationPointY += 1.5F * k;
-                glow = 1F - k;
-                break;
-            }
-            default:
-                break;
+        // Secondary motion trails the movement, but returns to the original
+        // attachment angles on every invocation (including the glow pass).
+        antR.rotateAngleX = antL.rotateAngleX = -0.025F * breath + 0.04F * impact;
+        antR.rotateAngleZ += 0.025F * sway;
+        antL.rotateAngleZ += 0.025F * sway;
+        for (int i = 0; i < vines.length; i++) {
+            float lag = ageInTicks * 0.10F + i * 0.75F;
+            vines[i].rotateAngleX = 0.035F * MathHelper.sin(lag - 0.8F) + 0.12F * wind - 0.15F * impact + 0.10F * spin;
+            vines[i].rotateAngleY = 0F;
+            vines[i].rotateAngleZ = 0.07F * MathHelper.sin(lag) + (i < 3 ? -1F : 1F) * 0.12F * spin;
         }
     }
 
@@ -282,6 +312,7 @@ public class ModelEntAnciao extends ModelBase {
     public static class GlowLayer implements LayerRenderer<EntityLivingBase> {
         private final RenderLivingBase<?> renderer;
         private final ResourceLocation calm, rage;
+        private final FloatBuffer savedColor = BufferUtils.createFloatBuffer(4);
 
         public GlowLayer(RenderLivingBase<?> renderer, ResourceLocation calm, ResourceLocation rage) {
             this.renderer = renderer;
@@ -310,7 +341,8 @@ public class ModelEntAnciao extends ModelBase {
             int srcAlpha = GL11.glGetInteger(GL14.GL_BLEND_SRC_ALPHA);
             int dstAlpha = GL11.glGetInteger(GL14.GL_BLEND_DST_ALPHA);
             int texture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
-            FloatBuffer color = BufferUtils.createFloatBuffer(4);
+            FloatBuffer color = savedColor;
+            color.clear();
             GL11.glGetFloat(GL11.GL_CURRENT_COLOR, color);
             float lightX = OpenGlHelper.lastBrightnessX;
             float lightY = OpenGlHelper.lastBrightnessY;
