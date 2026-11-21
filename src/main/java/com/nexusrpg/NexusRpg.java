@@ -41,6 +41,7 @@ public class NexusRpg {
             }
         });
         GameRegistry.registerWorldGenerator(new NexusStructureGenerator(), 1);
+        GameRegistry.registerWorldGenerator(new com.nexusrpg.world.ent.EntClearingGenerator(), 3);
         logger.info("Nexus RPG: preparando sistemas...");
     }
 
