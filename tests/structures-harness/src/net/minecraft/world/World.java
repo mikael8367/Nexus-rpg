@@ -11,6 +11,7 @@ public class World {
  public boolean isRemote, border=true, failFloor=false;
  public Provider provider=new Provider(); public Chunk chunk; public int height=256;
  public List<BlockPos> writes=new ArrayList<>();
+ public final List<net.minecraft.entity.Entity> loadedEntityList=new ArrayList<>();
  public String chestFailure=""; public BlockPos mutation;
  public World(Chunk c){chunk=c;}
  public static class Provider {public int dim=0; public int getDimension(){return dim;}}
