@@ -7,10 +7,11 @@ from PIL import Image
 root = Path(__file__).resolve().parents[2]
 java = root/'src/main/java/com/nexusrpg'
 reg = (java/'mobs/MobRegistration.java').read_text()
-expected = {'bramble_hound':7, 'cavern_crawler':8, 'basalt_guardian':9}
+expected = {'bramble_hound':7, 'cavern_crawler':8, 'basalt_guardian':9, 'reed_stilt':10, 'prism_tortoise':11}
 entries = re.findall(r'new ResourceLocation\("nexusrpg", "([a-z_]+)"\),\s*(\d+)\).*?\.egg\((0x[0-9A-F]+),\s*(0x[0-9A-F]+)\)', reg)
 assert {n:int(i) for n,i,_,_ in entries} == expected, entries
-assert len(entries) == 3 and all(a != b for _,_,a,b in entries)
+assert len(entries) == len(expected) and all(a != b for _,_,a,b in entries)
+assert len({i for _,i,_,_ in entries}) == len(entries)
 for p in java.rglob('*.java'):
     if p.name == 'MobRegistration.java': continue
     for i in re.findall(r'\.id\(new ResourceLocation\([^)]*\),\s*(\d+)\)',p.read_text()):
@@ -30,5 +31,5 @@ for name in expected:
     textures.append(hashlib.sha256(raw).digest())
     for lang in ['en_us','pt_br']:
         assert f'entity.{name}.name=' in (root/f'src/main/resources/assets/nexusrpg/lang/{lang}.lang').read_text(encoding='utf8')
-assert len(set(textures)) == 3
-print('PASS: IDs, egg declarations, client isolation, translations and three valid distinct textures')
+assert len(set(textures)) == len(expected)
+print('PASS: IDs, egg declarations, client isolation, translations and five valid distinct textures')

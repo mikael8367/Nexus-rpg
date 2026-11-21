@@ -49,13 +49,18 @@ public class MobBehaviorChecks {
     EntityPlayer p=new EntityPlayer();
     check(mob.attackEntityAsMob(p),"normal attack delegates to superclass");
     check(p.added==0,"no unsafe extra effect");
+    mob.attackResult=false;
+    check(!mob.attackEntityAsMob(p),"failed attack result propagated");
+    check(p.added==0,"no extra effect when hit fails");
     Method m=mob.getClass().getDeclaredMethod("getLootTable"); m.setAccessible(true); check(m.invoke(mob).toString().equals("nexusrpg:entities/"+loot),"loot id");
   }
   public static void main(String[] args) throws Exception {
     run(new EntityBramble(new World()),MobEffects.SLOWNESS,40,"bramble_hound");
     run(new EntityCavern(new World()),MobEffects.WEAKNESS,60,"cavern_crawler");
     run(new EntityBasalt(new World()),MobEffects.MINING_FATIGUE,80,"basalt_guardian");
-    System.out.println("PASS: ordinary attacks and three loot IDs on test doubles");
+    run(new EntityStilt(new World()),MobEffects.SLOWNESS,40,"reed_stilt");
+    run(new EntityPrism(new World()),MobEffects.SLOWNESS,40,"prism_tortoise");
+    System.out.println("PASS: ordinary attacks and five loot IDs on test doubles");
   }
 }'''
 for name, content in files.items():
@@ -63,10 +68,10 @@ for name, content in files.items():
 real = root/'src/main/java/com/nexusrpg/mobs'
 cmd=[str(java_home/'bin/javac'), '-source', '8', '-target', '8', '-d', str(classes)]
 cmd += [str(p) for p in src.rglob('*.java')]
-cmd += [str(real/name) for name in ('EntityNexusMob.java','EntityBramble.java','EntityCavern.java','EntityBasalt.java')]
+cmd += [str(real/name) for name in ('EntityNexusMob.java','EntityBramble.java','EntityCavern.java','EntityBasalt.java','EntityStilt.java','EntityPrism.java')]
 subprocess.run(cmd,check=True)
 subprocess.run([str(java_home/'bin/java'),'-cp',str(classes),'MobBehaviorChecks'],check=True)
-expected = {'bramble_hound':('string','wheat_seeds'), 'cavern_crawler':('flint','coal'), 'basalt_guardian':('cobblestone','iron_nugget')}
+expected = {'bramble_hound':('string','wheat_seeds'), 'cavern_crawler':('flint','coal'), 'basalt_guardian':('cobblestone','iron_nugget'), 'reed_stilt':('feather','wheat_seeds'), 'prism_tortoise':('quartz','gold_nugget')}
 for name, (common, extra) in expected.items():
     data=json.loads((root/'src/main/resources/assets/nexusrpg/loot_tables/entities'/f'{name}.json').read_text())
     pools=data['pools']; assert len(pools)==2
