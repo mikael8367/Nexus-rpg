@@ -65,3 +65,14 @@ compass.nexusrpg.biome.rosa_sanctum=Rosa Sanctum
 compass.nexusrpg.biome.umbral_reach=Umbral Reach
 compass.nexusrpg.biome.titan_canopy=Titan Canopy
 compass.nexusrpg.cancelled=Search cancelled; hold the compass
+
+# Magic staffs
+item.nexusrpg.arcane_staff.name=Arcane Staff
+item.nexusrpg.healing_staff.name=Healing Staff
+item.nexusrpg.ward_staff.name=Ward Staff
+item.nexusrpg.swift_staff.name=Swift Staff
+tooltip.nexusrpg.magic.arcane=Arcane ray: 16 blocks, 6 damage. Cooldown: 1s.
+tooltip.nexusrpg.magic.heal=Heal yourself: 6 health. Cooldown: 10s.
+tooltip.nexusrpg.magic.ward=Resistance I: 10s. Cooldown: 15s.
+tooltip.nexusrpg.magic.swift=Speed I: 15s. Cooldown: 10s.
+tooltip.nexusrpg.magic.cost=Costs 1 redstone dust per cast (except creative).
