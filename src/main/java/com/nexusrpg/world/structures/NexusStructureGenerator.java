@@ -12,12 +12,15 @@ import java.util.WeakHashMap;
 import java.util.LinkedHashMap;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.init.Blocks;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityChest;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.Chunk;
@@ -135,12 +138,19 @@ public final class NexusStructureGenerator implements IWorldGenerator {
         }
         BlockPos chestPos = new BlockPos(cx, max + 1, cz);
         if (plan.containsKey(chestPos) || plan.containsKey(chestPos.up())) return;
-        // Snapshot exact states, including plant/snow metadata, for conditional rollback.
+        // Cover the full footprint and all possible planned heights, including slopes.
+        // The loaded-entity list avoids querying or loading neighbouring chunks.
+        AxisAlignedBB occupiedVolume = new AxisAlignedBB(cx - 3, min, cz - 3,
+                                                        cx + 4, max + 11, cz + 4);
+        if (hasBlockingEntity(world, occupiedVolume)) return;
+        // Preserve plants, but allow snow layers: vanilla populates them before Forge
+        // generators in snowy biomes. Snapshot exact states for conditional rollback.
         Map<BlockPos, IBlockState> original = new LinkedHashMap<BlockPos, IBlockState>();
         for (BlockPos pos : plan.keySet()) {
             IBlockState state = chunk.getBlockState(pos);
             if ((pos.getX() >> 4) != chunkX || (pos.getZ() >> 4) != chunkZ ||
-                !isReplaceableSurface(state.getBlock()) || state.getBlock().hasTileEntity(state) ||
+                (state.getBlock() != Blocks.AIR && state.getBlock() != Blocks.SNOW_LAYER) ||
+                state.getBlock().hasTileEntity(state) ||
                 chunk.getTileEntityMap().containsKey(pos)) return;
             original.put(pos, state);
         }
@@ -157,6 +167,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             for (Map.Entry<BlockPos, IBlockState> entry : plan.entrySet()) {
                 BlockPos pos = entry.getKey();
                 if (chunkProvider.getLoadedChunk(chunkX, chunkZ) != chunk ||
+                    hasBlockingEntity(world, occupiedVolume) ||
                     !chunk.getBlockState(pos).equals(original.get(pos)) ||
                     chunk.getTileEntityMap().containsKey(pos)) return;
                 // Include failed writes: a mod may change a block while returning false.
@@ -166,8 +177,9 @@ public final class NexusStructureGenerator implements IWorldGenerator {
                     !chunk.getBlockState(pos).equals(entry.getValue()) ||
                     chunk.getTileEntityMap().containsKey(pos)) return;
             }
-            // Callbacks during later writes may have changed earlier positions.
+            // Callbacks during later writes may have changed earlier positions or spawned entities.
             if (chunkProvider.getLoadedChunk(chunkX, chunkZ) != chunk) return;
+            if (hasBlockingEntity(world, occupiedVolume)) return;
             if (!foundationUnchanged(chunk, foundation)) return;
             for (Map.Entry<BlockPos, IBlockState> entry : plan.entrySet())
                 if (!chunk.getBlockState(entry.getKey()).equals(entry.getValue()) ||
@@ -181,6 +193,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             attemptedChest = true;
             boolean placed = world.setBlockState(chestPos, Blocks.CHEST.getDefaultState(), 2);
             if (chunkProvider.getLoadedChunk(chunkX, chunkZ) != chunk) return;
+            if (hasBlockingEntity(world, occupiedVolume)) return;
             IBlockState chestState = chunk.getBlockState(chestPos);
             TileEntity tile = chunk.getTileEntityMap().get(chestPos);
             if (!placed || chestState.getBlock() != Blocks.CHEST || !(tile instanceof TileEntityChest) ||
@@ -219,6 +232,15 @@ public final class NexusStructureGenerator implements IWorldGenerator {
                 !chunk.getTileEntityMap().containsKey(feet.up()))
                 WizardTower.afterGenerated(world, feet);
         }
+    }
+
+    /** Inspect already loaded entity boxes without querying or loading chunks. */
+    private static boolean hasBlockingEntity(World world, AxisAlignedBB volume) {
+        for (Entity entity : world.loadedEntityList) {
+            if (!entity.isDead && (entity instanceof EntityLivingBase || entity.canBeCollidedWith()) &&
+                entity.getEntityBoundingBox().intersects(volume)) return true;
+        }
+        return false;
     }
 
     private static boolean foundationUnchanged(Chunk chunk, Map<BlockPos, IBlockState> foundation) {
