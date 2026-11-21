@@ -65,3 +65,14 @@ compass.nexusrpg.biome.rosa_sanctum=Santuário Rosado
 compass.nexusrpg.biome.umbral_reach=Ermos do Umbral
 compass.nexusrpg.biome.titan_canopy=Dossel dos Titãs
 compass.nexusrpg.cancelled=Busca cancelada; segure a bússola
+
+# Magic staffs
+item.nexusrpg.arcane_staff.name=Cajado Arcano
+item.nexusrpg.healing_staff.name=Cajado de Cura
+item.nexusrpg.ward_staff.name=Cajado de Proteção
+item.nexusrpg.swift_staff.name=Cajado da Agilidade
+tooltip.nexusrpg.magic.arcane=Raio arcano: 16 blocos, 6 de dano. Recarga: 1s.
+tooltip.nexusrpg.magic.heal=Cura própria: 6 de vida. Recarga: 10s.
+tooltip.nexusrpg.magic.ward=Resistência I: 10s. Recarga: 15s.
+tooltip.nexusrpg.magic.swift=Velocidade I: 15s. Recarga: 10s.
+tooltip.nexusrpg.magic.cost=Custa 1 pó de redstone por uso (exceto no criativo).
