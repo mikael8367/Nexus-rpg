@@ -49,6 +49,7 @@ public class NexusRpg {
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
+        com.nexusrpg.gear.OriginalGear.registerSmelting();
         GameRegistry.addSmelting(ModBlocks.MITHRIL_ORE, new ItemStack(ModItems.MITHRIL_INGOT), 0.7F);
         GameRegistry.addSmelting(ModBlocks.ADAMANTITE_ORE, new ItemStack(ModItems.ADAMANTITE_INGOT), 1.0F);
         GameRegistry.addSmelting(ModBlocks.DRACONITE_ORE, new ItemStack(ModItems.DRACONITE_INGOT), 1.5F);
