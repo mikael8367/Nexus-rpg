@@ -26,6 +26,8 @@ public final class SkillTree {
         }
     }
     private static final Map<String,Node> NODES;
+    private static final List<Node> ALL_NODES;
+    private static final Map<String,List<Node>> CLASS_NODES;
     static {
         Map<String,Node> n=new LinkedHashMap<>();
         addClass(n,"warrior","Guerreiro","Ímpeto de guerra","+3% de dano por grau na passiva corpo a corpo.","Golpe reforçado","+1 de dano por grau na ativa.","Bastião de guerra","+2 de dano e 2 segundos de resistência na suprema por grau.");
@@ -35,6 +37,16 @@ public final class SkillTree {
         addClass(n,"paladin","Paladino","Luz punitiva","+3% de dano por grau na passiva contra mortos-vivos hostis.","Bênção vital","+1 de cura por grau na ativa.","Santuário","+2 de cura e 2 segundos de resistência na suprema por grau.");
         addClass(n,"necromancer","Necromante","Roubo de vida","+0,5 de cura por grau na passiva de roubo de vida.","Dreno sombrio","+1 de dano e 0,5 de cura por grau na ativa.","Colheita de almas","+2 de dano por grau e 1 de cura por grau na suprema.");
         NODES=Collections.unmodifiableMap(n);
+        ALL_NODES=Collections.unmodifiableList(new ArrayList<>(n.values()));
+        Map<String,List<Node>> byClass=new LinkedHashMap<>();
+        for (Node node:ALL_NODES) {
+            List<Node> list=byClass.get(node.characterClass);
+            if (list==null) { list=new ArrayList<>(); byClass.put(node.characterClass,list); }
+            list.add(node);
+        }
+        for (Map.Entry<String,List<Node>> e:byClass.entrySet())
+            e.setValue(Collections.unmodifiableList(e.getValue()));
+        CLASS_NODES=Collections.unmodifiableMap(byClass);
     }
     private static void addClass(Map<String,Node> m,String c,String label,String passive,String passiveDesc,String active,String activeDesc,String ultimate,String ultimateDesc) {
         String root=c+".training", p=c+".passive", a=c+".active", u=c+".ultimate";
@@ -46,10 +58,9 @@ public final class SkillTree {
     private static void add(Map<String,Node> m,Node n) { if(m.put(n.id,n)!=null) throw new IllegalStateException(n.id); }
     public static Node node(String id) { return NODES.get(id); }
     public static List<Node> nodes(String characterClass) {
-        List<Node> result=new ArrayList<>();
-        for(Node n:NODES.values()) if(n.characterClass.equals(characterClass)) result.add(n);
-        return Collections.unmodifiableList(result);
+        List<Node> result=CLASS_NODES.get(characterClass);
+        return result==null ? Collections.emptyList() : result;
     }
-    public static List<Node> allNodes() { return Collections.unmodifiableList(new ArrayList<>(NODES.values())); }
+    public static List<Node> allNodes() { return ALL_NODES; }
     private SkillTree() {}
 }
