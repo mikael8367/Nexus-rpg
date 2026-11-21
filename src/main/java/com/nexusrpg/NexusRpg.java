@@ -54,6 +54,11 @@ public class NexusRpg {
     }
 
     @Mod.EventHandler
+    public void serverStarting(net.minecraftforge.fml.common.event.FMLServerStartingEvent event) {
+        event.registerServerCommand(new com.nexusrpg.quests.ZombieHunt.HuntCommand());
+    }
+
+    @Mod.EventHandler
     public void serverStopping(net.minecraftforge.fml.common.event.FMLServerStoppingEvent event) {
         CompassNetwork.clearJobs();
     }
