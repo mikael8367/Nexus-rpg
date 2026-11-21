@@ -1,0 +1,2 @@
+package net.minecraft.nbt;
+import java.util.*; public class NBTTagCompound { public Set<String> getKeySet(){return Collections.emptySet();} public boolean hasKey(String s,int i){return false;} public NBTTagCompound getCompoundTag(String s){return this;} public boolean getBoolean(String s){return true;} public int[] getIntArray(String s){return new int[0];} }
