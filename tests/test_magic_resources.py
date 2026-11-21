@@ -8,7 +8,9 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / 'src/main/resources/assets/nexusrpg'
 STAFFS = {'arcane_staff': 'minecraft:diamond', 'healing_staff': 'minecraft:golden_apple',
-          'ward_staff': 'minecraft:iron_ingot', 'swift_staff': 'minecraft:feather'}
+          'ward_staff': 'minecraft:iron_ingot', 'swift_staff': 'minecraft:feather',
+          'flameward_staff': 'minecraft:magma_cream', 'nightvision_staff': 'minecraft:golden_carrot',
+          'waterbreathing_staff': 'minecraft:fish'}
 
 class MagicResourcesTest(unittest.TestCase):
     def test_recipes(self):
@@ -18,6 +20,7 @@ class MagicResourcesTest(unittest.TestCase):
                 self.assertEqual(recipe['type'], 'minecraft:crafting_shaped')
                 self.assertEqual(recipe['pattern'], [' G ', ' RS', 'S  '])
                 self.assertEqual(recipe['key']['G']['item'], ingredient)
+                if staff == 'waterbreathing_staff': self.assertEqual(recipe['key']['G']['data'], 3)
                 self.assertEqual(recipe['key']['R']['item'], 'minecraft:redstone')
                 self.assertEqual(recipe['key']['S']['item'], 'minecraft:stick')
                 self.assertEqual(recipe['result']['item'], 'nexusrpg:' + staff)
@@ -42,7 +45,7 @@ class MagicResourcesTest(unittest.TestCase):
                     entries[key] = val
             for staff in STAFFS:
                 self.assertTrue(entries.get('item.nexusrpg.' + staff + '.name'))
-            for key in ['arcane', 'heal', 'ward', 'swift', 'cost']:
+            for key in ['arcane', 'heal', 'ward', 'swift', 'flameward', 'nightvision', 'waterbreathing', 'cost']:
                 self.assertTrue(entries.get('tooltip.nexusrpg.magic.' + key))
 
 if __name__ == '__main__':
