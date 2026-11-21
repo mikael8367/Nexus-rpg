@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "minecraft:glass_bottle"
+    },
+    {
+      "item": "minecraft:sugar"
+    },
+    {
+      "item": "minecraft:yellow_flower"
+    }
+  ],
+  "result": {
+    "item": "nexusrpg:field_antidote"
+  }
+}
