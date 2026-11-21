@@ -1,5 +1,6 @@
 package com.nexusrpg.quests;
 
+import com.nexusrpg.character.CharacterEvents;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -20,6 +21,8 @@ public final class HuntData {
         if (!persisted.hasKey(KEY)) return 0;
         if (!persisted.hasKey(KEY,10)) return -1;
         NBTTagCompound quest=persisted.getCompoundTag(KEY);
+        // Preserve extensions from unsupported data instead of modifying them.
+        for (String name : quest.getKeySet()) if (!name.equals("version") && !name.equals("kills")) return -1;
         if (!quest.hasKey("version",3) || quest.getInteger("version")!=1 || !quest.hasKey("kills",9)) return -1;
         NBTTagList kills=quest.getTagList("kills",8);
         // getTagList silently returns an empty list for a wrong element type.
@@ -32,6 +35,19 @@ public final class HuntData {
             catch (IllegalArgumentException ex) { return -1; }
         }
         return kills.tagCount()==GOAL ? 2 : 1;
+    }
+    /** Preserve unsupported clone destinations, with a backup of conflicting originals. */
+    public static boolean cloneProgress(NBTTagCompound source, NBTTagCompound destination) {
+        int from=status(source), to=status(destination);
+        if (to<0 || (from<0 && to>0)) {
+            CharacterEvents.carryCloneBackups(source,destination);
+            String p=EntityPlayer.PERSISTED_NBT_TAG;
+            net.minecraft.nbt.NBTBase original=source.hasKey(p,10)?source.getCompoundTag(p).getTag(KEY):source.getTag(p);
+            net.minecraft.nbt.NBTBase target=destination.hasKey(p,10)?destination.getCompoundTag(p).getTag(KEY):destination.getTag(p);
+            if (original!=null && !original.equals(target)) CharacterEvents.backupClone(destination,KEY,"unsupported_hunt_clone",original,target);
+            return false;
+        }
+        return CharacterEvents.cloneSection(source,destination,KEY);
     }
     public static int count(NBTTagCompound root) {
         int s=status(root); if(s<=0) return 0;
