@@ -25,7 +25,7 @@ public class Harness {
    p.alive=false; run(d); ok(p.hits==0,"dead player"); p.alive=true;
    p.world=new World(); run(d); ok(p.hits==0,"different world"); p.world=w;
    p.team=true; ok(!ai(d).shouldExecute(),"ally"); run(d); ok(p.hits==0,"ally hit"); p.team=false;
-   d.senses.visible=false; run(d); ok(p.hits==0&&d.nav.paths==1,"LOS/path"); d.senses.visible=true; run(d); ok(p.hits==1&&p.damage==6&&ally.hits==0,"ranged/only target");
+   int visual=DragonBreathVisual.calls; d.senses.visible=false; run(d); ok(p.hits==0&&d.nav.paths==1&&DragonBreathVisual.calls==visual,"LOS/path"); d.senses.visible=true; run(d); ok(p.hits==1&&p.damage==6&&ally.hits==0&&DragonBreathVisual.calls==visual+1,"ranged/only target/visual");
    ok((i==0&&p.fire==3)||(i==1&&p.effects.size()==2)||(i==2&&p.motionX>0&&p.velocityChanged)||(i==3&&p.effects.size()==2),"element");
    run(d); ok(p.hits==1,"cooldown"); NBTTagCompound n=new NBTTagCompound(); d.writeEntityToNBT(n); ok(n.getInteger("DragonAttackCooldown")==80,"save");
    EntityElementalDragon copy=new EntityFireDragon(w); copy.readEntityFromNBT(n); copy.setAttackTarget(p); run(copy); ok(p.hits==1,"reload cooldown"); n.setInteger("DragonAttackCooldown",9999); copy.readEntityFromNBT(n); NBTTagCompound n2=new NBTTagCompound(); copy.writeEntityToNBT(n2); ok(n2.getInteger("DragonAttackCooldown")==200,"clamp");
