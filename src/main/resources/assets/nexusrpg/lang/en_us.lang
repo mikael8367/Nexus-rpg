@@ -128,3 +128,5 @@ tooltip.nexusrpg.supply.escape=Speed I for 10 seconds; never replaces an active 
 entity.bramble_hound.name=Bramble Hound
 entity.cavern_crawler.name=Cavern Crawler
 entity.basalt_guardian.name=Basalt Guardian
+entity.reed_stilt.name=Reed Stilt
+entity.prism_tortoise.name=Prism Tortoise
