@@ -1,6 +1,6 @@
 # Exploração (Forge 1.12.2)
 
-Esta expansão adiciona três construções pequenas de superfície: uma masmorra de duas salas com passagem variável, uma ruína de castelo com muralha parcialmente danificada e uma torre iluminada decorativa. Cada uma contém um baú com a tabela vanilla `minecraft:chests/simple_dungeon`; na masmorra, o baú fica na segunda sala, atrás da parede. São plantas limitadas e não são castelos, masmorras subterrâneas ou torres completas de múltiplos andares. A seleção, a passagem e os danos variam deterministicamente por semente e chunk.
+Esta expansão adiciona três construções pequenas de superfície: uma masmorra com três seções, divisória central e passagens variáveis, uma ruína de castelo com muralha parcialmente danificada e uma torre iluminada decorativa. Cada uma contém um baú com a tabela vanilla `minecraft:chests/simple_dungeon`; na masmorra, o baú fica na seção mais distante da entrada. São plantas limitadas e não são castelos, masmorras subterrâneas ou torres completas de múltiplos andares. A seleção, as passagens e os danos variam deterministicamente por semente e chunk.
 
 ## Onde aparecem
 
