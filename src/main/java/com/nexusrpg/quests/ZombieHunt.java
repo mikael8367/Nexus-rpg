@@ -6,19 +6,15 @@ import java.util.UUID;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.ai.attributes.IAttributeInstance;
-import net.minecraft.entity.monster.EntityZombie;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.text.TextComponentString;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
@@ -49,12 +45,9 @@ public final class ZombieHunt {
     @SubscribeEvent public static void tick(TickEvent.PlayerTickEvent e) {
         if(e.phase==TickEvent.Phase.END && !e.player.world.isRemote && e.player.ticksExisted%20==0) apply(e.player);
     }
-    @SubscribeEvent(priority=EventPriority.LOWEST,receiveCanceled=false) public static void death(LivingDeathEvent e) {
-        if(e.getEntityLiving().world.isRemote || e.getEntityLiving().getClass()!=EntityZombie.class) return;
-        Entity source=e.getSource().getTrueSource();
-        if(!(source instanceof EntityPlayerMP)) return;
-        EntityPlayerMP p=(EntityPlayerMP)source;
-        if(p.world!=e.getEntityLiving().world || !HuntData.record(p.getEntityData(),e.getEntityLiving().getUniqueID())) return;
+    /** Called only by the deferred death-evidence handler, never directly from a death event. */
+    public static void confirmedZombie(EntityPlayerMP p, UUID victimId) {
+        if(!HuntData.record(p.getEntityData(),victimId)) return;
         int n=HuntData.count(p.getEntityData());
         if(n==HuntData.GOAL) { apply(p); say(p,"Cacada concluida! Recompensa permanente: +1 coracao de vida maxima."); }
         else say(p,"Zumbis derrotados: "+n+"/"+HuntData.GOAL+".");
