@@ -73,7 +73,7 @@ public final class CompassClient {
         @Override public void initGui() {
             if (resultWorld != mc.world) { status=-1; selected=-1; resultWorld=mc.world; }
             buttonList.clear();
-            for(int i=0;i<8;i++) buttonList.add(new GuiButton(i,width/2-154+(i%2)*157,height/2-65+(i/2)*22,154,20,name(i)));
+            for(int i=0;i<CompassNetwork.IDS.length;i++) buttonList.add(new GuiButton(i,width/2-154+(i%2)*157,height/2-65+(i/2)*22,154,20,name(i)));
         }
         @Override protected void actionPerformed(GuiButton button) throws IOException {
             // Retain the outstanding request until its reply arrives.
