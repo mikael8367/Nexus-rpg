@@ -22,6 +22,12 @@ public final class PlayerPose {
 
     /** Reverte pontos móveis antes de reutilizar o modelo para outro jogador. */
     public static void resetPoints(ModelBiped m, float armY) {
+        ModelRenderer[] parts = {m.bipedHead, m.bipedBody, m.bipedRightArm, m.bipedLeftArm, m.bipedRightLeg, m.bipedLeftLeg};
+        for (ModelRenderer part : parts) {
+            part.rotateAngleX = 0F;
+            part.rotateAngleY = 0F;
+            part.rotateAngleZ = 0F;
+        }
         m.bipedHead.setRotationPoint(0F, 0F, 0F);
         m.bipedBody.setRotationPoint(0F, 0F, 0F);
         m.bipedRightArm.setRotationPoint(-5F, armY, 0F);
