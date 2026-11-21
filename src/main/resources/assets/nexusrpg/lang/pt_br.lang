@@ -117,3 +117,5 @@ entity.fire_dragon.name=Dragão de Fogo
 entity.water_dragon.name=Dragão de Água
 entity.wind_dragon.name=Dragão do Vento
 entity.earth_dragon.name=Dragão da Terra
+
+item.nexusrpg.coal_recovery.name=Pacote de recuperação inerte
