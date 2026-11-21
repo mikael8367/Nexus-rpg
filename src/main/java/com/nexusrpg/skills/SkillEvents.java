@@ -124,6 +124,7 @@ public final class SkillEvents {
         String cmd = args.length == 1 ? "info" : args[1];
         String c = CharacterProfile.characterClass(p);
         if (!known(c)) { say(p, "Escolha uma classe no sistema de personagem primeiro."); return; }
+        if (!CharacterProfile.hasValidSelectedProfile(p)) { say(p, "Perfil incompatível; nada foi alterado."); return; }
         NBTTagCompound d = data(p);
         if (d == null) { say(p, "Dados de habilidades incompatíveis; nada foi alterado."); return; }
         int level = Math.max(1, CharacterProfile.level(p));
@@ -181,9 +182,9 @@ public final class SkillEvents {
         if (!CharacterProfile.consumeMana(p, cost)) { say(p, "Mana insuficiente (necessario: " + cost + ")."); return; }
         d.setLong(timer, SkillTreeService.deadline(tick, ultimate ? 1200 : 160));
         int intelligence = Math.max(0, Math.min(100, CharacterProfile.intelligence(p)));
-        boolean treeValid = SkillTreeService.valid(d);
-        int activeRank = treeValid ? SkillTreeService.rank(d, SkillTree.node(c + ".active")) : 0;
-        int ultimateRank = treeValid ? SkillTreeService.rank(d, SkillTree.node(c + ".ultimate")) : 0;
+        // runtimeValid above already validated the tree before spending mana.
+        int activeRank = SkillTreeService.rank(d, SkillTree.node(c + ".active"));
+        int ultimateRank = SkillTreeService.rank(d, SkillTree.node(c + ".ultimate"));
         float power = 4.0F + r + Math.min(5.0F, intelligence * 0.05F) + (ultimate ? ultimateRank * 2 : activeRank);
         if ("paladin".equals(c)) {
             if (ultimate) {
@@ -237,7 +238,8 @@ public final class SkillEvents {
         if (!(event.getEntityLiving() instanceof EntityPlayerMP)) return;
         EntityPlayerMP p = (EntityPlayerMP) event.getEntityLiving();
         if (p.world.isRemote || p.getServer() == null || !p.getServer().isCallingFromMinecraftThread()
-            || !p.isEntityAlive() || p.isSpectator() || !"assassin".equals(CharacterProfile.characterClass(p))) return;
+            || !p.isEntityAlive() || p.isSpectator() || !CharacterProfile.hasValidSelectedProfile(p)
+            || !"assassin".equals(CharacterProfile.characterClass(p))) return;
         DamageSource source = event.getSource();
         float amount = event.getAmount();
         if (!dodgeSourceAllowed(source, amount) || p.isEntityInvulnerable(source)
@@ -267,7 +269,7 @@ public final class SkillEvents {
         if (!(source instanceof EntityPlayerMP) || event.getEntityLiving().world.isRemote || !(event.getAmount() > 0)
             || Float.isInfinite(event.getAmount()) || Float.isNaN(event.getAmount())) return;
         EntityPlayerMP p = (EntityPlayerMP) source;
-        if (!p.isEntityAlive() || p.isSpectator()) return;
+        if (!p.isEntityAlive() || p.isSpectator() || !CharacterProfile.hasValidSelectedProfile(p)) return;
         EntityLivingBase victim = event.getEntityLiving();
         if (!hostile(p, victim)) return;
         String c = CharacterProfile.characterClass(p);
@@ -281,7 +283,7 @@ public final class SkillEvents {
         else if ("archer".equals(c) && event.getSource().isProjectile()) bonus = 0.15F;
         else if ("assassin".equals(c) && victim.getHealth() < victim.getMaxHealth() * 0.5F) bonus = 0.15F;
         else if ("paladin".equals(c) && victim.isEntityUndead()) bonus = 0.15F;
-        int passiveRank = SkillTreeService.valid(d) ? SkillTreeService.rank(d,SkillTree.node(c+".passive")) : 0;
+        int passiveRank = SkillTreeService.rank(d,SkillTree.node(c+".passive"));
         if (bonus > 0) event.setAmount(boostedDamage(event.getAmount(), bonus, r, passiveRank));
     }
     // This is after armor and LivingHurtEvent cancellation, but a later listener can
@@ -292,8 +294,8 @@ public final class SkillEvents {
         if (!(source instanceof EntityPlayerMP) || event.getEntityLiving().world.isRemote || !(event.getAmount() > 0)
             || Float.isInfinite(event.getAmount()) || Float.isNaN(event.getAmount())) return;
         EntityPlayerMP p = (EntityPlayerMP) source;
-        if (!p.isEntityAlive() || p.isSpectator() || !hostile(p, event.getEntityLiving())
-            || !"necromancer".equals(CharacterProfile.characterClass(p))) return;
+        if (!p.isEntityAlive() || p.isSpectator() || !CharacterProfile.hasValidSelectedProfile(p)
+            || !hostile(p, event.getEntityLiving()) || !"necromancer".equals(CharacterProfile.characterClass(p))) return;
         NBTTagCompound d = data(p);
         if (!SkillTreeService.runtimeValid(d)) return;
         long t = now(p);
