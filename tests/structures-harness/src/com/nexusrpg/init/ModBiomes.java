@@ -1,0 +1,2 @@
+package com.nexusrpg.init;
+import net.minecraft.world.biome.Biome; public class ModBiomes { public static final Biome ENCHANTED_GROVE=new Biome();public static final Biome FROST_CROWN=new Biome();public static final Biome SUNKEN_EMPIRE=new Biome();public static final Biome WITCHING_MIRE=new Biome();public static final Biome CINDER_HEART=new Biome();public static final Biome ROSA_SANCTUM=new Biome();public static final Biome UMBRAL_REACH=new Biome();public static final Biome TITAN_CANOPY=new Biome(); }

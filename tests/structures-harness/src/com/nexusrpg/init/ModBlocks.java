@@ -1,0 +1,2 @@
+package com.nexusrpg.init;
+import net.minecraft.block.Block; public class ModBlocks { public static final Block MITHRIL_ORE=new Block("MITHRIL"),ADAMANTITE_ORE=new Block("ADAMANTITE"),DRACONITE_ORE=new Block("DRACONITE"); }
