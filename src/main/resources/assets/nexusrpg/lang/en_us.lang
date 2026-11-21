@@ -123,3 +123,8 @@ item.nexusrpg.escape_powder.name=Escape Powder
 tooltip.nexusrpg.supply.bandage=Heals up to 2 hearts; not consumed at full health.
 tooltip.nexusrpg.supply.antidote=Removes poison and wither without clearing beneficial effects.
 tooltip.nexusrpg.supply.escape=Speed I for 10 seconds; never replaces an active speed effect.
+
+# Criaturas da primeira leva
+entity.bramble_hound.name=Bramble Hound
+entity.cavern_crawler.name=Cavern Crawler
+entity.basalt_guardian.name=Basalt Guardian
