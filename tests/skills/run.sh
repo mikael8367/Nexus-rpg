@@ -9,6 +9,8 @@ cd "$(dirname "$0")/../.."
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 find src/main/java -name '*.java' > "$out/sources"
-"$JAVA_HOME/bin/javac" -encoding UTF-8 -source 8 -target 8 -cp "$FORGE_MAPPED_JAR:$DEPS_CP" -d "$out" @"$out/sources" tests/skills/SkillRulesTest.java tests/skills/SkillTreeTest.java
+"$JAVA_HOME/bin/javac" -encoding UTF-8 -source 8 -target 8 -cp "$FORGE_MAPPED_JAR:$DEPS_CP" -d "$out" @"$out/sources" tests/skills/SkillRulesTest.java tests/skills/SkillTreeTest.java tests/skills/CloneNbtRegressionTest.java tests/character/CharacterCloneProtectionTest.java
 "$JAVA_HOME/bin/java" -cp "$out:$FORGE_MAPPED_JAR:$DEPS_CP" com.nexusrpg.skills.SkillRulesTest
 "$JAVA_HOME/bin/java" -cp "$out:$FORGE_MAPPED_JAR:$DEPS_CP" com.nexusrpg.skills.SkillTreeTest
+"$JAVA_HOME/bin/java" -cp "$out:$FORGE_MAPPED_JAR:$DEPS_CP" com.nexusrpg.skills.CloneNbtRegressionTest
+"$JAVA_HOME/bin/java" -cp "$out:$FORGE_MAPPED_JAR:$DEPS_CP" com.nexusrpg.character.CharacterCloneProtectionTest

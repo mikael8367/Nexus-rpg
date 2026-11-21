@@ -66,7 +66,7 @@ public final class SkillTreeTest {
         check(!SkillTreeService.runtimeValid(malformed),"ramo sem pré-requisitos bloqueia ativação");
         // Runtime tags are not allowed to bypass cooldowns or be overwritten by casting.
         String[] longs={"cast_warrior","ultimate_mage","combo_start_archer","combo_until_assassin",
-            "pal_combo_start","pal_combo_until","leech_ready"};
+            "pal_combo_start","pal_combo_until","leech_ready","assassin_dodge_ready_v1"};
         for (String key:longs) {
             NBTTagCompound bad=new NBTTagCompound(); bad.setString(key,"preserve"); NBTTagCompound before=bad.copy();
             check(!SkillTreeService.runtimeValid(bad) && before.equals(bad),"tipo inválido preservado: "+key);
