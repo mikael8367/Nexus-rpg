@@ -3,6 +3,7 @@ package com.nexusrpg.energy;
 import javax.annotation.Nullable;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;
@@ -11,8 +12,19 @@ import net.minecraftforge.items.ItemStackHandler;
 
 public final class TileCoalGenerator extends TileProducer {
     private int burnTicks;
-    // Keep anomalous legacy inventory data as an archival backup, not live items.
-    @Nullable private NBTTagCompound preservedFuelInventory;
+    // Archives are raw NBT, including wrong types; never treat them as live items.
+    private static final String FUEL_ARCHIVE = "NexusRpgOriginalFuelInventory";
+    private final NBTTagCompound fuelArchives = new NBTTagCompound();
+
+    private static void archive(NBTTagCompound archives, NBTBase value) {
+        // Repeated loads must not create unlimited copies of the same data.
+        for (String key : archives.getKeySet())
+            if (key.startsWith(FUEL_ARCHIVE) && value.equals(archives.getTag(key))) return;
+        String key = FUEL_ARCHIVE;
+        int suffix = 1;
+        while (archives.hasKey(key)) key = FUEL_ARCHIVE + "_" + suffix++;
+        archives.setTag(key, value.copy());
+    }
     public final ItemStackHandler inventory = new ItemStackHandler(1) {
         @Override protected void onContentsChanged(int slot) { markDirty(); }
         @Override public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
@@ -42,14 +54,19 @@ public final class TileCoalGenerator extends TileProducer {
     }
     @Override public NBTTagCompound writeToNBT(NBTTagCompound tag) {
         super.writeToNBT(tag); tag.setInteger("BurnTicks", burnTicks); tag.setTag("FuelInventory", inventory.serializeNBT());
-        if (preservedFuelInventory != null) tag.setTag("NexusRpgOriginalFuelInventory", preservedFuelInventory.copy());
+        for (String key : fuelArchives.getKeySet()) {
+            NBTBase value = fuelArchives.getTag(key);
+            if (!tag.hasKey(key)) tag.setTag(key, value.copy());
+            else if (!value.equals(tag.getTag(key))) archive(tag, value);
+        }
         return tag;
     }
     @Override public void readFromNBT(NBTTagCompound tag) {
         super.readFromNBT(tag); burnTicks = Math.max(0, Math.min(1600, tag.getInteger("BurnTicks")));
         inventory.setStackInSlot(0, ItemStack.EMPTY);
-        preservedFuelInventory = tag.hasKey("NexusRpgOriginalFuelInventory", 10)
-            ? tag.getCompoundTag("NexusRpgOriginalFuelInventory").copy() : null;
+        for (String key : new java.util.HashSet<String>(fuelArchives.getKeySet())) fuelArchives.removeTag(key);
+        for (String key : tag.getKeySet())
+            if (key.startsWith(FUEL_ARCHIVE)) fuelArchives.setTag(key, tag.getTag(key).copy());
         if (tag.hasKey("FuelInventory", 10)) {
             NBTTagCompound original = tag.getCompoundTag("FuelInventory");
             net.minecraft.nbt.NBTTagList items = original.getTagList("Items", 10);
@@ -74,7 +91,10 @@ public final class TileCoalGenerator extends TileProducer {
                 // insertions remain restricted by the normal item handler.
                 inventory.setStackInSlot(0, loaded);
             }
-            if (malformed && preservedFuelInventory == null) preservedFuelInventory = original.copy();
+            // Compare the whole compound to protect unknown fields and item data too.
+            if (malformed || !original.equals(inventory.serializeNBT())) archive(fuelArchives, original);
+        } else if (tag.hasKey("FuelInventory")) {
+            archive(fuelArchives, tag.getTag("FuelInventory"));
         }
     }
 }
