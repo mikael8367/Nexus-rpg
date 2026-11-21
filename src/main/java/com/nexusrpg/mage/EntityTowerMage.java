@@ -13,6 +13,8 @@ import net.minecraft.entity.ai.EntityAIWatchClosest;
 import net.minecraft.entity.monster.EntityMob;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.init.MobEffects;
+import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
@@ -25,8 +27,10 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.util.text.TextComponentString;
 
-/** A persistent tower guardian. The spell is an instant, line-of-sight magic hit. */
+/** Persistent tower guardian with alternating server-authoritative spells. */
 public final class EntityTowerMage extends EntityMob implements IRangedAttackMob {
+    private int spellCooldown;
+    private int nextSpell;
     private final BossInfoServer bossBar = new BossInfoServer(
             new TextComponentString("Mago da Torre"), BossInfo.Color.PURPLE, BossInfo.Overlay.PROGRESS);
 
@@ -59,22 +63,41 @@ public final class EntityTowerMage extends EntityMob implements IRangedAttackMob
 
     @Override
     public void attackEntityWithRangedAttack(EntityLivingBase target, float distanceFactor) {
-        if (world.isRemote || !isEntityAlive() || target == null || !target.isEntityAlive()
+        if (world.isRemote || spellCooldown > 0 || !isEntityAlive() || target == null || !target.isEntityAlive()
                 || getDistanceSq(target) > 256.0D || !getEntitySenses().canSee(target)) return;
-        // Real damage credited to this mob, not a visual-only effect. No explosion or terrain damage.
-        target.attackEntityFrom(DamageSource.causeIndirectMagicDamage(this, this), 6.0F);
+        if (nextSpell == 0) {
+            EntityMageFireball fireball = new EntityMageFireball(world, this);
+            double dx = target.posX - fireball.posX;
+            double dy = target.posY + target.height * 0.55D - fireball.posY;
+            double dz = target.posZ - fireball.posZ;
+            if (dx * dx + dy * dy + dz * dz < 0.0001D) return;
+            fireball.shoot(dx, dy, dz, 1.0F, 0.0F);
+            if (!world.spawnEntity(fireball)) return;
+            world.playSound(null, posX, posY, posZ, SoundEvents.ENTITY_BLAZE_SHOOT,
+                    SoundCategory.HOSTILE, 1.0F, 1.0F);
+        } else {
+            boolean hit = target.attackEntityFrom(DamageSource.causeIndirectMagicDamage(this, this),
+                    nextSpell == 1 ? 6.0F : 4.0F);
+            if (hit && nextSpell == 2) target.addPotionEffect(new PotionEffect(MobEffects.SLOWNESS, 60, 0));
+            renderSpellBeam(target, nextSpell == 1 ? EnumParticleTypes.SPELL_WITCH : EnumParticleTypes.SPELL_INSTANT);
+            world.playSound(null, posX, posY, posZ, SoundEvents.ENTITY_WITCH_THROW,
+                    SoundCategory.HOSTILE, 1.0F, 1.0F);
+        }
+        nextSpell = (nextSpell + 1) % 3;
+        spellCooldown = 40;
+    }
+
+    private void renderSpellBeam(EntityLivingBase target, EnumParticleTypes particle) {
         if (world instanceof WorldServer) {
             WorldServer server = (WorldServer) world;
             double sx = posX, sy = posY + getEyeHeight(), sz = posZ;
             double ex = target.posX, ey = target.posY + target.height * 0.55D, ez = target.posZ;
             for (int i = 1; i <= 12; i++) {
                 double t = i / 12.0D;
-                server.spawnParticle(EnumParticleTypes.SPELL_WITCH, sx + (ex - sx) * t,
+                server.spawnParticle(particle, sx + (ex - sx) * t,
                         sy + (ey - sy) * t, sz + (ez - sz) * t, 1, 0.0D, 0.0D, 0.0D, 0.0D, new int[0]);
             }
         }
-        world.playSound(null, posX, posY, posZ, SoundEvents.ENTITY_WITCH_THROW,
-                SoundCategory.HOSTILE, 1.0F, 1.0F);
     }
 
     @Override
@@ -83,6 +106,8 @@ public final class EntityTowerMage extends EntityMob implements IRangedAttackMob
     @Override
     public void writeEntityToNBT(NBTTagCompound tag) {
         super.writeEntityToNBT(tag);
+        tag.setInteger("NexusMageSpellCooldown", spellCooldown);
+        tag.setInteger("NexusMageNextSpell", nextSpell);
         if (hasHome()) {
             BlockPos home = getHomePosition();
             tag.setBoolean("NexusMageHasHome", true);
@@ -98,6 +123,8 @@ public final class EntityTowerMage extends EntityMob implements IRangedAttackMob
     @Override
     public void readEntityFromNBT(NBTTagCompound tag) {
         super.readEntityFromNBT(tag);
+        spellCooldown = Math.max(0, Math.min(40, tag.getInteger("NexusMageSpellCooldown")));
+        nextSpell = Math.max(0, Math.min(2, tag.getInteger("NexusMageNextSpell")));
         if (tag.getBoolean("NexusMageHasHome")) {
             setHomePosAndDistance(new BlockPos(tag.getInteger("NexusMageHomeX"),
                     tag.getInteger("NexusMageHomeY"), tag.getInteger("NexusMageHomeZ")),
@@ -109,9 +136,10 @@ public final class EntityTowerMage extends EntityMob implements IRangedAttackMob
 
     @Override
     protected void updateAITasks() {
+        if (spellCooldown > 0) spellCooldown--;
         super.updateAITasks();
         bossBar.setPercent(Math.max(0.0F, Math.min(1.0F, getHealth() / getMaxHealth())));
-        if (hasCustomName()) bossBar.setName(getDisplayName());
+        bossBar.setName(hasCustomName() ? getDisplayName() : new TextComponentString("Mago da Torre"));
     }
 
     @Override
