@@ -11,6 +11,30 @@ public class ExplorationHarness {
  static void ok(boolean b,String s){if(!b)throw new AssertionError(s);}
  static long seed(int type){for(long i=0;i<100000;i++){Random r=new Random(i ^ 0x6e65787573524750L);if(r.nextInt(180)==0&&r.nextInt(3)==type)return i;}throw new AssertionError();}
  static void run(ExplorationGenerator g, Chunk c, World w){g.generate(new Random(1),c.x,c.z,w,null,(x,z)->x==c.x&&z==c.z?c:null);}
+ // Enumerate the choices, not just Java Random seeds, so rare doorway combinations are covered.
+ static final class Choices extends Random {
+  final int[] values; int i;
+  Choices(int... values){this.values=values;}
+  @Override public int nextInt(int bound){
+   ok(i<values.length && values[i]>=0 && values[i]<bound,"invalid scripted random choice");
+   return values[i++];
+  }
+ }
+ static void assertDungeonConnected(Map<BlockPos,IBlockState> p, String label){
+  Set<String> seen=new HashSet<>(); ArrayDeque<int[]> q=new ArrayDeque<>(); q.add(new int[]{7,3});
+  while(!q.isEmpty()){
+   int[] a=q.remove(); int x=a[0],z=a[1]; String k=x+","+z;
+   if(x<3||x>12||z<3||z>12||seen.contains(k)||
+      p.containsKey(new BlockPos(x,65,z))||p.containsKey(new BlockPos(x,66,z))||(x==8&&z==10))continue;
+   seen.add(k); q.add(new int[]{x+1,z}); q.add(new int[]{x-1,z}); q.add(new int[]{x,z+1}); q.add(new int[]{x,z-1});
+  }
+  for(int x=4;x<=11;x++)for(int z=4;z<=11;z++){
+   if(x==8&&z==10)continue;
+   if(!p.containsKey(new BlockPos(x,65,z))&&!p.containsKey(new BlockPos(x,66,z)))
+    ok(seen.contains(x+","+z),"unreachable "+label+" "+x+","+z);
+  }
+  ok(seen.contains("8,9")||seen.contains("7,10")||seen.contains("9,10")||seen.contains("8,11"),"inaccessible chest "+label);
+ }
  public static void main(String[] args) throws Exception {
   ok(ExplorationRegistration.class.getAnnotation(net.minecraftforge.fml.common.Mod.EventBusSubscriber.class).modid().equals("nexusrpg"),"subscriber modid");
   ok(ExplorationRegistration.class.getMethod("register",net.minecraftforge.event.RegistryEvent.Register.class).isAnnotationPresent(net.minecraftforge.fml.common.eventhandler.SubscribeEvent.class),"missing SubscribeEvent");
@@ -29,7 +53,40 @@ public class ExplorationHarness {
     seen.add(key);
     queue.add(new int[]{x+1,z});queue.add(new int[]{x-1,z});queue.add(new int[]{x,z+1});queue.add(new int[]{x,z-1});
    }
-   ok(seen.contains("8,9")||seen.contains("7,10")||seen.contains("9,10")||seen.contains("8,11"),"chest unreachable");
+   ok(seen.contains("8,9")||seen.contains("7,10")||seen.contains("9,10")||seen.contains("8,11"),"chest unreachable type="+type+" seed="+n);
+   if(type==0){
+    // Every walkable cell must be reachable, not merely a face of the chest.
+    for(int x=4;x<=11;x++)for(int z=4;z<=11;z++){
+     if(x==8&&z==10)continue;
+     if(!p.containsKey(new BlockPos(x,65,z))&&!p.containsKey(new BlockPos(x,66,z)))
+      ok(seen.contains(x+","+z),"unreachable dungeon cell "+n+" "+x+","+z);
+     ok(p.containsKey(new BlockPos(x,68,z)),"missing roof");
+    }
+    for(int z:new int[]{6,9}){
+     int doors=0;for(int x=4;x<=11;x++)if(!p.containsKey(new BlockPos(x,65,z)))doors++;
+     ok(doors==1,"crosswall must have one door");
+    }
+    ok(p.equals(ExplorationGenerator.plan(0,64,0,type,new Random(n))),"nondeterministic layout");
+   }
+  }
+  int exhaustive=0;
+  for(int divider=0;divider<4;divider++)for(int first=0;first<7;first++)
+   for(int second=0;second<(divider==2?7:6);second++)for(int passage=0;passage<2;passage++){
+    Choices r=new Choices(divider,first,second,passage);
+    Map<BlockPos,IBlockState> p=ExplorationGenerator.plan(0,64,0,0,r);
+    ok(r.i==4,"unexpected number of dungeon choices");
+    ok(!p.containsKey(new BlockPos(8,65,10))&&!p.containsKey(new BlockPos(8,66,10)),"blocked chest");
+    assertDungeonConnected(p,divider+"/"+first+"/"+second+"/"+passage);
+    exhaustive++;
+   }
+  ok(exhaustive==350,"incomplete exhaustive dungeon combinations");
+  Set<Map<BlockPos,IBlockState>> layouts=new HashSet<>();
+  for(int n=0;n<100;n++)layouts.add(ExplorationGenerator.plan(0,64,0,0,new Random(n)));
+  ok(layouts.size()>25,"insufficient dungeon variety");
+  Map<BlockPos,IBlockState> origin=ExplorationGenerator.plan(0,64,0,0,new Random(42));
+  Map<BlockPos,IBlockState> negative=ExplorationGenerator.plan(-32,64,-48,0,new Random(42));
+  for(Map.Entry<BlockPos,IBlockState> e:origin.entrySet()){
+   BlockPos p=e.getKey();ok(e.getValue().equals(negative.get(new BlockPos(p.getX()-32,p.getY(),p.getZ()-48))),"negative chunk translation");
   }
   for(int type=0;type<3;type++){
    Chunk c=new Chunk(0,0,null,64);World w=new World(c);w.seed=seed(type);run(new ExplorationGenerator(),c,w);
@@ -89,6 +146,15 @@ public class ExplorationHarness {
    run(new ExplorationGenerator(),c,w);
    ok(mode.equals("outside") ? !w.writes.isEmpty() : w.writes.isEmpty(),"vanilla bounds guard "+mode);
   }
+  c=new Chunk(0,0,null,64);w=new World(c);w.seed=seed(0);w.failFloor=true;
+  run(new ExplorationGenerator(),c,w);
+  ok(!c.tiles.containsKey(new BlockPos(8,65,10)),"chest after failed floor placement");
+  ok(c.getBlockState(new BlockPos(3,64,3)).getBlock()==Blocks.AIR,"floor remained after failed write");
+  c=new Chunk(0,0,null,64);w=new World(c);w.seed=seed(0);w.chestFailure="foreignPlan";w.mutation=new BlockPos(4,64,4);
+  run(new ExplorationGenerator(),c,w);
+  ok(c.getBlockState(w.mutation).getBlock()==Blocks.LOG,"foreign block overwritten or deleted");
+  ok(!c.tiles.containsKey(new BlockPos(8,65,10)),"chest after foreign modification");
+  ok(c.getBlockState(new BlockPos(3,64,3)).getBlock()==Blocks.AIR,"owned blocks not rolled back");
   for(String mode:new String[]{"falseBefore","throwBefore","falseNoTile","throwAfterNoTile"}){
    c=new Chunk(0,0,null,64);w=new World(c);w.seed=seed(0);w.chestFailure=mode;
    try{run(new ExplorationGenerator(),c,w);ok(!mode.startsWith("throw"),"expected exception");}catch(RuntimeException e){ok(mode.startsWith("throw"),"unexpected exception");}
@@ -98,6 +164,6 @@ public class ExplorationHarness {
    c=new Chunk(0,0,null,64);w=new World(c);w.seed=seed(0);w.chestFailure=mode;try{run(new ExplorationGenerator(),c,w);}catch(RuntimeException e){ok(mode.startsWith("throw"),"exception");}
    ok(c.tiles.get(new BlockPos(8,65,10)) instanceof TileEntityChest,"lost chest");ok(c.getBlockState(new BlockPos(8,64,10)).getBlock()!=Blocks.AIR,"lost chest support");
   }
-  System.out.println("PASS 900 layouts, chest access, generation, bounds, saved chunks, collision, border, rollback and tile preservation (simulated world)");
+  System.out.println("PASS 900 seeded layouts + 350 exhaustive dungeon choices, chest access, generation, bounds, saved chunks, collision, border, rollback and tile preservation (simulated world)");
  }
 }
