@@ -18,9 +18,11 @@ import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.WorldServer;
+import net.minecraft.world.EnumDifficulty;
 import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -90,8 +92,15 @@ public final class SkillEvents {
     private static void buff(EntityLivingBase target, net.minecraft.potion.Potion potion, int ticks, int amp) {
         target.addPotionEffect(new PotionEffect(potion, ticks, amp));
     }
-    private static void damage(EntityPlayerMP p, EntityLivingBase target, float amount) {
-        target.attackEntityFrom(DamageSource.causePlayerDamage(p), amount);
+    static DamageSource skillDamageSource(EntityPlayerMP p, boolean fire) {
+        DamageSource source = DamageSource.causePlayerDamage(p);
+        return fire ? source.setFireDamage() : source;
+    }
+    private static void damage(EntityPlayerMP p, EntityLivingBase target, float amount, boolean fire) {
+        // LivingEntity.attackEntityFrom checks Fire Resistance, but not the entity's
+        // isImmuneToFire flag for arbitrary damage sources (e.g. our player source).
+        if (fire && target.isImmuneToFire()) return;
+        target.attackEntityFrom(skillDamageSource(p, fire), amount);
     }
     private static boolean combo(NBTTagCompound d, String c, EntityLivingBase target, long tick) {
         return tick <= d.getLong("combo_until_" + c) && tick >= d.getLong("combo_start_" + c)
@@ -111,7 +120,7 @@ public final class SkillEvents {
         EntityPlayerMP p = event.getPlayer();
         if (p.world.isRemote || !p.isEntityAlive() || p.isSpectator()) return;
         String[] args = raw.toLowerCase(java.util.Locale.ROOT).split("\\s+");
-        if (args.length > 3 || (args.length == 3 && !"up".equals(args[1]))) { say(p, "Use !skill info, !skill tree, !skill up [id], !skill cast ou !skill ultimate."); return; }
+        if (args.length > 3 || (args.length == 3 && !"up".equals(args[1]))) { say(p, "Use !skill info, !skill tree, !skill up [id], !skill cast, !skill fire ou !skill ultimate."); return; }
         String cmd = args.length == 1 ? "info" : args[1];
         String c = CharacterProfile.characterClass(p);
         if (!known(c)) { say(p, "Escolha uma classe no sistema de personagem primeiro."); return; }
@@ -126,7 +135,7 @@ public final class SkillEvents {
             if ("tree".equals(cmd)) for (SkillTree.Node node:SkillTree.nodes(c)) {
                 say(p, node.id + " — " + node.name + " " + SkillTreeService.rank(d,node) + "/" + node.maxRank + ", custo " + node.cost + ": " + node.description);
             }
-            else say(p, "!skill tree = árvore; !skill up [id] = gastar ponto(s); !skill cast/ultimate = usar.");
+            else say(p, "!skill tree = árvore; !skill up [id] = gastar ponto(s); !skill cast/ultimate = usar." + ("mage".equals(c) ? " !skill fire = dano de fogo sem incendiar; compartilha a mana e a recarga da ativa normal. Imunidade a fogo pode bloquear." : ""));
             return;
         }
         if ("up".equals(cmd)) {
@@ -135,14 +144,16 @@ public final class SkillEvents {
             say(p,result.isEmpty()?"Habilidade aprimorada: " + id + ".":result);
             return;
         }
+        if ("fire".equals(cmd)) { SkillTreeService.activateFire(p); return; }
         boolean ultimate = "ultimate".equals(cmd);
-        if (!ultimate && !"cast".equals(cmd)) { say(p, "Use !skill info, !skill up, !skill cast ou !skill ultimate."); return; }
+        if (!ultimate && !"cast".equals(cmd)) { say(p, "Use !skill info, !skill up, !skill cast, !skill fire ou !skill ultimate."); return; }
         SkillTreeService.activate(p, ultimate);
     }
 
     // Entrada interna: somente chamada por SkillTreeService após checagem do servidor.
-    static void activateServer(EntityPlayerMP p, boolean ultimate) {
+    static void activateServer(EntityPlayerMP p, boolean ultimate, boolean fire) {
         String c=CharacterProfile.characterClass(p);
+        if (fire && (ultimate || !"mage".equals(c))) { say(p, "O ataque de fogo é exclusivo do mago."); return; }
         NBTTagCompound d=data(p);
         if (!known(c) || d==null) { say(p, "Dados de habilidades indisponíveis."); return; }
         if (!SkillTreeService.runtimeValid(d)) { say(p, "Dados de habilidades incompatíveis; nada foi alterado."); return; }
@@ -185,7 +196,7 @@ public final class SkillEvents {
                 d.setLong("pal_combo_start", tick); d.setLong("pal_combo_until", SkillTreeService.deadline(tick, 120));
             }
         } else if (!ultimate) {
-            damage(p, target, power);
+            damage(p, target, power, fire);
             // Only self-buffs: applying harmful effects directly to a target could bypass
             // another mod's canceled damage event / territory protection.
             if ("mage".equals(c)) buff(p, MobEffects.RESISTANCE, 60, 0);
@@ -198,7 +209,7 @@ public final class SkillEvents {
             if (target != null) { targets = new ArrayList<>(); targets.add(target); }
             for (EntityLivingBase e : targets) {
                 boolean chained = combo(d, c, e, tick);
-                damage(p, e, power + 4 + (chained ? 3 : 0));
+                damage(p, e, power + 4 + (chained ? 3 : 0), false);
             }
             if ("warrior".equals(c)) buff(p, MobEffects.RESISTANCE, 120 + 40 * ultimateRank, 0);
             else if ("mage".equals(c)) buff(p, MobEffects.REGENERATION, 100 + 40 * ultimateRank, 0);
@@ -207,7 +218,42 @@ public final class SkillEvents {
             else if ("necromancer".equals(c)) p.heal(Math.min(6, targets.size() * 2) + ultimateRank);
             d.setLong("combo_until_" + c, 0);
         }
-        say(p, ultimate ? "Suprema ativada!" : "Habilidade ativada!");
+        say(p, ultimate ? "Suprema ativada!" : fire ? "Ataque de fogo ativado!" : "Habilidade ativada!");
+    }
+
+    // Only ordinary hostile melee and projectile attacks can be dodged: never PvP,
+    // environment, unblockable, fire, magical or explosive damage. No damage is redirected.
+    static boolean dodgeSourceAllowed(DamageSource source, float amount) {
+        return source != null && amount > 0 && !Float.isInfinite(amount) && !Float.isNaN(amount)
+            && !source.isUnblockable() && !source.isDamageAbsolute() && !source.isExplosion()
+            && !source.isMagicDamage() && !source.isFireDamage();
+    }
+    static boolean dodgeRoll(long tick, long ready, int roll) {
+        return tick >= 0 && tick <= Long.MAX_VALUE - 400 && ready >= 0 && tick >= ready
+            && roll >= 0 && roll < 15;
+    }
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = false)
+    public static void dodge(LivingAttackEvent event) {
+        if (!(event.getEntityLiving() instanceof EntityPlayerMP)) return;
+        EntityPlayerMP p = (EntityPlayerMP) event.getEntityLiving();
+        if (p.world.isRemote || p.getServer() == null || !p.getServer().isCallingFromMinecraftThread()
+            || !p.isEntityAlive() || p.isSpectator() || !"assassin".equals(CharacterProfile.characterClass(p))) return;
+        DamageSource source = event.getSource();
+        float amount = event.getAmount();
+        if (!dodgeSourceAllowed(source, amount) || p.isEntityInvulnerable(source)
+            || (p.capabilities.disableDamage && !source.canHarmInCreative())
+            || (source.isDifficultyScaled() && p.world.getDifficulty() == EnumDifficulty.PEACEFUL)) return;
+        Entity attacker = source.getTrueSource(), immediate = source.getImmediateSource();
+        if (!(attacker instanceof EntityLivingBase) || !hostile(p, (EntityLivingBase) attacker)
+            || immediate == null || (!source.isProjectile() && immediate != attacker)) return;
+        NBTTagCompound d = data(p);
+        if (!SkillTreeService.runtimeValid(d)) return;
+        long tick = now(p), ready = d.getLong("assassin_dodge_ready_v1");
+        if (tick < 0 || tick > Long.MAX_VALUE - 400 || tick < ready) return;
+        if (!dodgeRoll(tick, ready, p.world.rand.nextInt(100))) return;
+        d.setLong("assassin_dodge_ready_v1", SkillTreeService.deadline(tick, 400));
+        event.setCanceled(true);
+        say(p, "Esquiva!");
     }
 
     static float boostedDamage(float amount, float bonus, int training, int passive) {
@@ -268,44 +314,42 @@ public final class SkillEvents {
         skills.removeTag("pal_combo_start");
         skills.removeTag("pal_combo_until");
     }
-    // Original values win; do not lose unrelated destination fields installed by another handler.
-    static NBTTagCompound cloneSkills(NBTTagCompound original, NBTTagCompound destination, boolean death) {
-        NBTTagCompound copy = original.copy();
-        if (destination != null) {
-            for (String key : destination.getKeySet()) {
-                if (!copy.hasKey(key)) copy.setTag(key, destination.getTag(key).copy());
-                else if ("tree_v1".equals(key) && copy.hasKey(key, 10) && destination.hasKey(key, 10)) {
-                    NBTTagCompound oldTree = copy.getCompoundTag(key), newTree = destination.getCompoundTag(key);
-                    for (String node : newTree.getKeySet())
-                        if (!oldTree.hasKey(node)) oldTree.setTag(node, newTree.getTag(node).copy());
-                }
-            }
-        }
-        // Preserve malformed NBT rather than deleting recoverable tags.
-        if (death && SkillTreeService.runtimeValid(copy)) clearCombos(copy);
-        return copy;
-    }
+    // An entire allocation tree is one snapshot: merging independently spent
+    // points or unknown nested fields can create a combination nobody earned.
     @SubscribeEvent
     public static void clone(PlayerEvent.Clone event) {
         if (event.getEntityPlayer().world.isRemote) return;
-        NBTTagCompound oldRoot = event.getOriginal().getEntityData();
-        NBTTagCompound root = event.getEntityPlayer().getEntityData();
-        String key=EntityPlayer.PERSISTED_NBT_TAG;
-        if (!oldRoot.hasKey(key,10)) {
-            if(oldRoot.hasKey(key) && !root.hasKey(key)) root.setTag(key,oldRoot.getTag(key).copy());
-            return;
+        cloneSkillData(event.getOriginal().getEntityData(), event.getEntityPlayer().getEntityData(), event.isWasDeath());
+    }
+    static void cloneSkillData(NBTTagCompound oldRoot, NBTTagCompound root, boolean death) {
+        String persistedKey=EntityPlayer.PERSISTED_NBT_TAG;
+        // A repeated death event may see the already-cleared result. It is not
+        // a conflicting allocation snapshot and must not generate a backup.
+        if (death && oldRoot.hasKey(persistedKey,10) && root.hasKey(persistedKey,10)) {
+            NBTTagCompound oldPersisted=oldRoot.getCompoundTag(persistedKey), destPersisted=root.getCompoundTag(persistedKey);
+            if (oldPersisted.hasKey(KEY,10) && destPersisted.hasKey(KEY,10)) {
+                NBTTagCompound original=oldPersisted.getCompoundTag(KEY);
+                if (SkillTreeService.runtimeValid(original)) {
+                    NBTTagCompound cleared=original.copy();
+                    clearCombos(cleared);
+                    if (!cleared.equals(original) && cleared.equals(destPersisted.getCompoundTag(KEY))) {
+                        com.nexusrpg.character.CharacterEvents.carryCloneBackups(oldRoot,root);
+                        return;
+                    }
+                }
+            }
         }
-        NBTTagCompound oldPersisted=oldRoot.getCompoundTag(key);
-        if (!oldPersisted.hasKey(KEY)) return;
-        if (root.hasKey(key) && !root.hasKey(key,10)) return;
-        if (!root.hasKey(key)) root.setTag(key,new NBTTagCompound());
-        NBTTagCompound persisted=root.getCompoundTag(key);
-        if (persisted.hasKey(KEY) && !persisted.hasKey(KEY,10)) return;
-        if (!oldPersisted.hasKey(KEY,10)) {
-            if (!persisted.hasKey(KEY)) persisted.setTag(KEY,oldPersisted.getTag(KEY).copy());
-            return;
+        if (!com.nexusrpg.character.CharacterEvents.cloneSection(oldRoot,root,KEY)) return;
+        NBTTagCompound skills=root.getCompoundTag(persistedKey).getCompoundTag(KEY);
+        if (death && SkillTreeService.runtimeValid(skills)) {
+            NBTTagCompound cleared=skills.copy();
+            clearCombos(cleared);
+            if (!cleared.equals(skills)) {
+                // These validated keys are short-lived combat state, not progress.
+                // Saving a whole skill tree on every ordinary death grows the
+                // player save without bound; conflicting snapshots still get backups.
+                root.getCompoundTag(persistedKey).setTag(KEY,cleared);
+            }
         }
-        NBTTagCompound destinationSkills = persisted.hasKey(KEY, 10) ? persisted.getCompoundTag(KEY) : null;
-        persisted.setTag(KEY, cloneSkills(oldPersisted.getCompoundTag(KEY), destinationSkills, event.isWasDeath()));
     }
 }
