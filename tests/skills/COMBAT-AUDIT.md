@@ -1,0 +1,13 @@
+# Auditoria parcial: eventos de combate Forge 1.12.2
+
+**Não corrigido:** XP em `CharacterEvents.death` e missão de zumbis em `ZombieHunt.death` ainda podem dar crédito quando outro ouvinte LOWEST cancela posteriormente. Não migramos esses dados persistentes para uma fila volátil: logout, encerramento, limite da fila ou entidades que não chamam `super.onDeath` poderiam perder progresso. Essas duas correções precisam de uma solução de confirmação durável e recuperação testada; nenhum dado existente foi migrado ou apagado.
+
+**Necromante (mitigação, não garantia universal):** passiva guarda o evento e verifica seu estado final e queda de saúde no fim do tick, antes de consumir recarga ou curar. Ativa/suprema guardam o evento correspondente à fonte única e verificam após o ataque; a suprema conta só os alvos com dano observado. A observação é limitada a 512 e falha fechada. A cura passiva pendente pode ser perdida no logout, restart, sobrecarga ou se o alvo se curar antes da confirmação. Eventos cancelados no momento da observação e posteriormente descancelados também não geram passiva. Cancelamento de `LivingDamageEvent` não garante que a absorção fique intacta: no bytecode base de Forge 1.12.2 ela já é debitada antes desse evento.
+
+A queda de saúde por si só não prova causalidade quando outros mods alteram a vida de forma reentrante ou depois de um evento não cancelado; uma implementação própria de entidade pode ignorar a semântica padrão. O código não resolve isso em geral. A ativa e a suprema ainda gastam mana/recarga e marcam combo mesmo se o dano for bloqueado, como antes. Não há mudança de XP ou NBT da missão.
+
+## Evidência da API
+Bytecode do `EntityLivingBase` mapeado 14.23.5.2860: `onDeath` consulta `ForgeHooks.onLivingDeath` e retorna se cancelado; só depois marca morte e chama `onLivingDrops` no lado servidor, fora do bloco condicionado por `doMobLoot`. Isso é somente para a implementação base: subclasses podem substituí-la. Em `damageEntity`, `onLivingHurt` precede armadura/absorção; `onLivingDamage` ocorre após a primeira dedução de absorção e antes de reduzir saúde. `attackEntityFrom` retornar true não comprova dano aplicado.
+
+## Testes e limites
+`DamageConfirmationTest` é teste de lógica com evento Forge mapeado e subclasse explicitamente cancelável, sem event bus real ou mundo Minecraft; verifica cancelamento tardio e valores/saúde inválidos. Os testes existentes de árvore, clonagem, perfil, caçada zumbi e trilhas cobrem persistência/clonagem e elegibilidade de dados, não a integração completa dos listeners. Não houve teste no jogo, nem teste real de desconexão ou restart. Outros mods, múltiplos ataques no mesmo tick, mudanças de time, hit absorption e concorrência de ouvintes ainda exigem testes reais.
