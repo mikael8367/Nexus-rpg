@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "minecraft:stone"
+    },
+    {
+      "item": "nexusrpg:auronite_ingot"
+    }
+  ],
+  "result": {
+    "item": "nexusrpg:auronite_ore"
+  }
+}
