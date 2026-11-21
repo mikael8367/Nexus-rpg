@@ -85,7 +85,7 @@ jobs:
           PY
 
       - name: Upload reobfuscated mod jar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: NexusRPG-Forge-1.12.2
           path: ${{ steps.jar.outputs.path }}
