@@ -111,3 +111,9 @@ item.nexusrpg.waterbreathing_staff.name=Water Breathing Staff
 tooltip.nexusrpg.magic.flameward=Fire resistance for 30 seconds
 tooltip.nexusrpg.magic.nightvision=Night vision for 60 seconds
 tooltip.nexusrpg.magic.waterbreathing=Water breathing for 30 seconds
+
+# Dragon entity names use the names supplied to EntityEntryBuilder.
+entity.fire_dragon.name=Fire Dragon
+entity.water_dragon.name=Water Dragon
+entity.wind_dragon.name=Wind Dragon
+entity.earth_dragon.name=Earth Dragon

@@ -3,7 +3,9 @@ package com.nexusrpg.init;
 import com.nexusrpg.NexusRpg;
 import net.minecraft.block.Block;
 import net.minecraft.creativetab.CreativeTabs;
+import net.minecraft.entity.EntityList;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemMonsterPlacer;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.init.Items;
@@ -47,10 +49,33 @@ public final class NexusCreativeTab {
                 // Preserve a default for items which suppress all their variants.
                 if (items.size() == previousSize) items.add(new ItemStack(item));
             }
+            addDragonEggs(items);
         }
     };
 
     private NexusCreativeTab() {}
+
+    /** Add the vanilla spawn-egg variants without reassigning the vanilla item. */
+    private static void addDragonEggs(NonNullList<ItemStack> items) {
+        String[] dragons = {"fire_dragon", "water_dragon", "wind_dragon", "earth_dragon"};
+        for (String dragon : dragons) {
+            ResourceLocation id = new ResourceLocation(NexusRpg.MODID, dragon);
+            if (!EntityList.ENTITY_EGGS.containsKey(id)) continue;
+            boolean present = false;
+            for (ItemStack stack : items) {
+                if (!stack.isEmpty() && stack.getItem() == Items.SPAWN_EGG
+                        && id.equals(ItemMonsterPlacer.getNamedIdFrom(stack))) {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) {
+                ItemStack egg = new ItemStack(Items.SPAWN_EGG);
+                ItemMonsterPlacer.applyEntityIdToItemStack(egg, id);
+                items.add(egg);
+            }
+        }
+    }
 
     /** Ensure the tab is constructed even if a registry event was not received. */
     public static void init() {}
