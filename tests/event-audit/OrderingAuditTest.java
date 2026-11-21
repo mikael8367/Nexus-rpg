@@ -1,7 +1,6 @@
 package com.nexusrpg.achievements;
 
 import com.nexusrpg.character.CharacterEvents;
-import com.nexusrpg.quests.ZombieHunt;
 import com.nexusrpg.skills.SkillEvents;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
@@ -36,7 +35,9 @@ public final class OrderingAuditTest {
     }
     public static void main(String[] args) throws Exception {
         lateCancellation(handler(CharacterEvents.class, "death", LivingDeathEvent.class), "XP");
-        lateCancellation(handler(ZombieHunt.class, "death", LivingDeathEvent.class), "zombie quest");
+        SubscribeEvent zombie = handler(ZombieDeathEvidence.class, "death", LivingDeathEvent.class);
+        check(zombie.priority() == EventPriority.LOWEST && zombie.receiveCanceled(), "zombie candidate subscription changed; reassess");
+        System.out.println("Zombie candidate only: separate behavioral tests are required");
         lateCancellation(handler(SkillEvents.class, "leech", LivingDamageEvent.class), "necromancer leech");
         PendingDeaths<Object, CancelableEvent> pending = new PendingDeaths<Object, CancelableEvent>();
         Object victim = new Object();
