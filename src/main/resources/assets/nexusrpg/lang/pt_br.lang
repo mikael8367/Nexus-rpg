@@ -123,3 +123,8 @@ item.nexusrpg.escape_powder.name=Pó de Fuga
 tooltip.nexusrpg.supply.bandage=Cura até 2 corações; não consome com vida cheia.
 tooltip.nexusrpg.supply.antidote=Remove veneno e efeito Wither sem remover efeitos benéficos.
 tooltip.nexusrpg.supply.escape=Velocidade I por 10 segundos; não substitui velocidade ativa.
+
+# Criaturas da primeira leva
+entity.bramble_hound.name=Cão Espinheiro
+entity.cavern_crawler.name=Rastejador das Cavernas
+entity.basalt_guardian.name=Guardião de Basalto
