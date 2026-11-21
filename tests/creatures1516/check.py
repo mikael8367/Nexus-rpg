@@ -13,15 +13,18 @@ out=Path(sys.argv[1]).resolve()
 if out.exists(): raise SystemExit('output already exists')
 java=root/'src/main/java/com/nexusrpg/mobs'
 assets=root/'src/main/resources/assets/nexusrpg'
-doc=(root/'CRIATURAS_15_16.md').read_text()
+registration=(java/'MobRegistration.java').read_text()
+renderer=(java/'client/MobClientRegistration.java').read_text()
+languages=[(assets/'lang'/f'{lang}.lang').read_text() for lang in ('en_us','pt_br')]
 expected={'dune_burrower':('Burrower',15,'sand','flint'),'root_warden':('Rootwarden',16,'stick','wheat_seeds')}
 imgs=[]
 for name,(cls,id,common,extra) in expected.items():
     entity=(java/f'Entity{cls}.java').read_text()
     assert f'"entities/{name}"' in entity and 'extends EntityNexusMob' in entity
     assert 'attackEntityAsMob' not in entity and 'Potion' not in entity
-    assert f'new ResourceLocation("nexusrpg", "{name}"), {id}' in doc
-    assert f'new Model{cls}()' in doc and f'entity.{name}.name=' in doc
+    assert f'new ResourceLocation("nexusrpg", "{name}"), {id}' in registration
+    assert f'Entity{cls}.class' in registration and f'new Model{cls}()' in renderer
+    assert all(f'entity.{name}.name=' in lang for lang in languages)
     data=json.loads((assets/'loot_tables/entities'/f'{name}.json').read_text()); p=data['pools']
     assert len(p)==2 and p[0]['name']==name+'_common' and p[1]['name']==name+'_extra'
     assert p[0]['entries'][0]['name']=='minecraft:'+common and p[1]['entries'][0]['name']=='minecraft:'+extra
