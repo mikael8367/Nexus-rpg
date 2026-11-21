@@ -33,3 +33,7 @@ stubs.update({
  'net/minecraftforge/fml/common/registry/EntityEntry.java': '''package net.minecraftforge.fml.common.registry; import net.minecraft.util.ResourceLocation; public class EntityEntry { public Class<?> entity; public ResourceLocation key; public int id,primary,secondary; public String name; public boolean egg; }''',
  'net/minecraftforge/fml/common/registry/EntityEntryBuilder.java': '''package net.minecraftforge.fml.common.registry; import net.minecraft.util.ResourceLocation; public class EntityEntryBuilder<T> { EntityEntry e=new EntityEntry(); public static <T> EntityEntryBuilder<T> create(){return new EntityEntryBuilder<T>();} public EntityEntryBuilder<T> entity(Class<T> c){e.entity=c;return this;} public EntityEntryBuilder<T> id(ResourceLocation k,int id){e.key=k;e.id=id;return this;} public EntityEntryBuilder<T> name(String n){e.name=n;return this;} public EntityEntryBuilder<T> tracker(int a,int b,boolean c){return this;} public EntityEntryBuilder<T> egg(int a,int b){e.egg=true;e.primary=a;e.secondary=b;return this;} public EntityEntry build(){return e;} }''',
 })
+
+# Minimal movement fixtures; these do not model Minecraft's travel or collision resolution.
+from flight_stubs import add_flight_stubs
+add_flight_stubs(stubs)
