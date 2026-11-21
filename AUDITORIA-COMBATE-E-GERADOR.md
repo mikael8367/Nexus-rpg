@@ -8,7 +8,7 @@ Uma pesquisa separada no experimento não publicado reproduziu mais cenários de
 
 ## Morte, XP e missão de zumbis
 
-A implementação publicada escuta `LivingDeathEvent` com prioridade LOWEST, mas um listener posterior na mesma prioridade ainda pode cancelar a morte. Nesse caso XP e missão de zumbis podem receber crédito indevido. Foi estudada uma alternativa baseada em `LivingDropsEvent` depois de observar a morte, mas ela pode perder crédito para entidades que não emitam drops e em outras situações ambíguas. Ela não foi integrada. As caçadas de esqueleto/aranha têm seu próprio mecanismo e também exigem teste com mods e reinício.
+O XP ainda é concedido no `LivingDeathEvent` LOWEST e um listener posterior na mesma prioridade pode cancelar a morte, dando crédito indevido. A caçada de zumbis passou a aguardar, em memória e por dois ticks, uma evidência posterior de morte no `LivingDropsEvent` e validações adicionais antes de conceder progresso. Isso mitiga o cancelamento tardio, mas não garante correção para mods que alterem a sequência de eventos. Desconexão, reinício, mudança de dimensão, fila cheia ou morte sem evento correspondente podem causar perda de crédito legítimo. Não altera o formato NBT. As caçadas de esqueleto/aranha têm mecanismo semelhante e também exigem teste com mods e reinício.
 
 ## Necromante
 
