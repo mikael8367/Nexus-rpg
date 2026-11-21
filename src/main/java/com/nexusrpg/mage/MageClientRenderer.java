@@ -1,6 +1,9 @@
 package com.nexusrpg.mage;
 
 import net.minecraft.client.model.ModelWitch;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.RenderSnowball;
+import net.minecraft.init.Items;
 import net.minecraft.client.renderer.entity.RenderLiving;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.ResourceLocation;
@@ -21,6 +24,9 @@ public final class MageClientRenderer {
     @SubscribeEvent
     public static void registerRenderer(RegistryEvent.Register<EntityEntry> event) {
         RenderingRegistry.registerEntityRenderingHandler(EntityTowerMage.class, MageRender::new);
+        RenderingRegistry.registerEntityRenderingHandler(EntityMageFireball.class,
+                manager -> new RenderSnowball<EntityMageFireball>(manager, Items.FIRE_CHARGE,
+                        Minecraft.getMinecraft().getRenderItem()));
     }
 
     private static final class MageRender extends RenderLiving<EntityTowerMage> {
