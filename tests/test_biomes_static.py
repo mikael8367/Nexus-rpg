@@ -8,21 +8,21 @@ SOURCE = (ROOT / 'src/main/java/com/nexusrpg/init/ModBiomes.java').read_text(enc
 EXPECTED = {
     'ENCHANTED_GROVE': 'COOL', 'FROST_CROWN': 'ICY', 'SUNKEN_EMPIRE': 'DESERT',
     'WITCHING_MIRE': 'WARM', 'CINDER_HEART': 'DESERT', 'ROSA_SANCTUM': 'COOL',
-    'UMBRAL_REACH': 'WARM', 'TITAN_CANOPY': 'WARM',
+    'UMBRAL_REACH': 'WARM', 'TITAN_CANOPY': 'WARM', 'MAGMA_WASTES': 'DESERT',
 }
 
 class BiomeSourceChecks(unittest.TestCase):
     def test_unique_biome_ids_and_register_all(self):
         defined = dict(re.findall(r'public static final Biome (\w+) = create\("([a-z_]+)"', SOURCE))
         self.assertEqual(set(defined), set(EXPECTED))
-        self.assertEqual(len(set(defined.values())), 8)
+        self.assertEqual(len(set(defined.values())), 9)
         block = re.search(r'event\.getRegistry\(\)\.registerAll\((.*?)\);', SOURCE, re.S).group(1)
         self.assertEqual(set(re.findall(r'[A-Z_]+', block)), set(EXPECTED))
-        self.assertEqual(len(re.findall(r'[A-Z_]+', block)), 8)
+        self.assertEqual(len(re.findall(r'[A-Z_]+', block)), 9)
 
     def test_additions_have_climate_and_types(self):
         calls = re.findall(r'add\((\w+), BiomeType\.(\w+), ([^;]+)\);', SOURCE)
-        self.assertEqual(len(calls), 8)
+        self.assertEqual(len(calls), 9)
         self.assertEqual({biome: climate for biome, climate, types in calls}, EXPECTED)
         self.assertTrue(all('Type.' in types for _, _, types in calls))
         self.assertIn('new BiomeEntry(biome, 4)', SOURCE)
@@ -31,7 +31,7 @@ class BiomeSourceChecks(unittest.TestCase):
 
     def test_diagnostics_cover_all_climates_without_chunk_queries(self):
         calls = re.findall(r'report\((\w+), BiomeType\.(\w+)\);', SOURCE)
-        self.assertEqual(len(calls), 8)
+        self.assertEqual(len(calls), 9)
         self.assertEqual(dict(calls), EXPECTED)
         diagnostic = SOURCE.split('public static void reportOverworldBiomes', 1)[1].split('private static void add(', 1)[0]
         for forbidden in ('getChunk(', 'getChunkFrom', 'getBiome(', 'setBlockState(', 'setBiome'):
