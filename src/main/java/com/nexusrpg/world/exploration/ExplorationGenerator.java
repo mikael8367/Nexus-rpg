@@ -57,7 +57,9 @@ public final class ExplorationGenerator implements IWorldGenerator {
             !world.getWorldBorder().contains(new BlockPos(x0 + 13, 64, z0 + 13))) return;
         if (overlapsVanilla(world, x0 + 2, z0 + 2, x0 + 13, z0 + 13)) return;
         int ground = chunk.getHeightValue(8, 8) - 1;
-        if (ground < 1 || ground + 13 >= world.getHeight()) return;
+        // Require four contiguous, solid natural layers under every inspected column.
+        // A level top alone can be a thin floating shelf or a roof over water/a cave.
+        if (ground < 3 || ground + 13 >= world.getHeight()) return;
         // Strict flat natural ground, a 1-block horizontal buffer and completely clear sky.
         // Checking every column all the way down rejects known or unknown built blocks,
         // including underground constructions; false negatives are intentional.
@@ -67,7 +69,8 @@ public final class ExplorationGenerator implements IWorldGenerator {
             for (int y = 0; y < world.getHeight(); y++) {
                 IBlockState state = chunk.getBlockState(x, y, z);
                 if (state.getBlock().hasTileEntity(state) ||
-                    (y > ground ? state.getBlock() != Blocks.AIR : !natural(state.getBlock()))) return;
+                    (y > ground ? state.getBlock() != Blocks.AIR : !natural(state.getBlock())) ||
+                    (y <= ground && y >= ground - 3 && !solidNatural(state.getBlock()))) return;
             }
         }
         for (BlockPos p : chunk.getTileEntityMap().keySet())
@@ -96,7 +99,7 @@ public final class ExplorationGenerator implements IWorldGenerator {
                 if (!world.setBlockState(p, entry.getValue(), 2) ||
                     !chunk.getBlockState(p).equals(entry.getValue()) || chunk.getTileEntityMap().containsKey(p)) return;
             }
-            if (!intact(provider, chunk, chunkX, chunkZ, plan) ||
+            if (!intact(provider, chunk, chunkX, chunkZ, plan) || !supported(chunk, ground) ||
                 chunk.getBlockState(chest).getBlock() != Blocks.AIR ||
                 chunk.getBlockState(chest.up()).getBlock() != Blocks.AIR ||
                 chunk.getTileEntityMap().containsKey(chest) || chunk.getTileEntityMap().containsKey(chest.up())) return;
@@ -106,7 +109,8 @@ public final class ExplorationGenerator implements IWorldGenerator {
             TileEntity tile = chunk.getTileEntityMap().get(chest);
             if (chunk.getBlockState(chest).getBlock() != Blocks.CHEST || !(tile instanceof TileEntityChest) ||
                 chunk.getBlockState(chest.up()).getBlock() != Blocks.AIR ||
-                chunk.getTileEntityMap().containsKey(chest.up()) || !intact(provider, chunk, chunkX, chunkZ, plan)) return;
+                chunk.getTileEntityMap().containsKey(chest.up()) || !intact(provider, chunk, chunkX, chunkZ, plan) ||
+                !supported(chunk, ground)) return;
             ((TileEntityChest) tile).setLootTable(LootTableList.CHESTS_SIMPLE_DUNGEON, random.nextLong());
             tile.markDirty();
             complete = true;
@@ -178,6 +182,21 @@ public final class ExplorationGenerator implements IWorldGenerator {
             // Our ore generator runs first; these veins are terrain, like the vanilla ores above.
             b == ModBlocks.MITHRIL_ORE || b == ModBlocks.ADAMANTITE_ORE || b == ModBlocks.DRACONITE_ORE;
     }
+    private static boolean solidNatural(Block b) {
+        return natural(b) && b != Blocks.AIR && b != Blocks.WATER && b != Blocks.FLOWING_WATER &&
+            b != Blocks.LAVA && b != Blocks.FLOWING_LAVA;
+    }
+    // Third-party callbacks can change the ground while the plan is being placed.
+    private static boolean supported(Chunk chunk, int ground) {
+        for (int x = 2; x <= 13; x++) for (int z = 2; z <= 13; z++) {
+            if (!surface(chunk.getBlockState(x, ground, z).getBlock())) return false;
+            for (int y = ground; y >= ground - 3; y--) {
+                IBlockState state = chunk.getBlockState(x, y, z);
+                if (!solidNatural(state.getBlock()) || state.getBlock().hasTileEntity(state)) return false;
+            }
+        }
+        return true;
+    }
     private static boolean overlapsVanilla(World world, int minX, int minZ, int maxX, int maxZ) {
         for (String name : new String[]{"Village", "Mineshaft", "Temple", "Stronghold", "Monument", "Mansion"}) {
             MapGenStructureData data = (MapGenStructureData)world.getPerWorldStorage().getOrLoadData(MapGenStructureData.class, name);
@@ -188,7 +207,7 @@ public final class ExplorationGenerator implements IWorldGenerator {
                 NBTTagCompound feature = tags.getCompoundTag(key);
                 if (!feature.hasKey("BB", 11)) return true;
                 int[] bb = feature.getIntArray("BB");
-                if (bb.length != 6 || bb[0] > bb[3] || bb[2] > bb[5]) return true;
+                if (bb.length != 6 || bb[0] > bb[3] || bb[1] > bb[4] || bb[2] > bb[5]) return true;
                 if (bb[0] <= maxX && bb[3] >= minX && bb[2] <= maxZ && bb[5] >= minZ) return true;
             }
         }
