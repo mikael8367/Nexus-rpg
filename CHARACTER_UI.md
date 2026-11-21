@@ -1,0 +1,9 @@
+# Interface de personagem — Forge 1.12.2
+
+Após a seleção permanente de classe, o menu abre com K e possui sete abas na parte inferior. A seleção inicial e sua dica de bônus foram preservadas. A aba Personagem mostra classe, nível, XP, pontos de atributo, mana e vida atuais. A aba Atributos mostra valores totais (com bônus da classe) e envia cada clique de + pelo canal já existente; o servidor valida classe, pontos e teto. A informação vem do último perfil sincronizado pelo servidor; rejeições por dados inválidos não recebem mensagem específica da interface.
+
+Habilidades exibe os controles reais do chat e a regra de pontos; o aperfeiçoamento e os pontos de habilidade não são sincronizados pelo canal de personagem, portanto use `!skill info` para consultá-los no chat. Pontos de habilidade e atributos são separados. Equipamentos mostra os itens atuais da cabeça, peito, pernas, pés e ambas as mãos, sem movimentá-los; ao passar o cursor sobre um item aparece sua descrição. Missões, Mapa e Conquistas dizem “Ainda não disponível”: não há sistema RPG correspondente integrado a estas abas. Não há um novo GUI handler nem alteração de GUI de máquinas. As novas frases da interface usam português se o idioma do jogo começa por pt e inglês nos demais idiomas; os nomes de classe e atributos continuam usando as traduções existentes.
+
+## Limitações e testes
+
+Compilação `compileJava` offline com Java 8 e Forge 1.12.2 concluída. Ainda é necessário testar no jogo real: resolução/escala e fontes, navegação e tooltip, seleção de classe, fechar/reabrir com K, distribuição e sincronização em servidor dedicado, morte/reconexão e interação com outras GUIs/mods. O menu não é uma interface de inventário nem permite gerenciar equipamento; não cria missões, mapa ou conquistas. Ele não contorna o bloqueio do sistema de personagem para perfil parcial ou NBT inválido. Não foi feito commit nem publicação. Faça backup do mundo antes de testar.
