@@ -8,7 +8,9 @@ public final class ModelChecks {
         check(new ModelBramble(), "legs", 4);
         check(new ModelCavern(), "legs", 6);
         check(new ModelBasalt(), null, 0);
-        System.out.println("PASS: three real ModelBase constructors, UV bounds and walk animation");
+        check(new ModelStilt(), "legs", 2);
+        check(new ModelPrism(), "legs", 4);
+        System.out.println("PASS: five real ModelBase constructors, UV bounds and walk animation");
     }
     private static void check(ModelBase model, String legField, int legs) throws Exception {
         if (model.textureWidth != 64 || model.textureHeight != 64) throw new AssertionError("texture size");
