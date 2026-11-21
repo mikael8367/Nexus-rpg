@@ -18,8 +18,9 @@ public class World {
  public Border getWorldBorder(){return new Border();}
  public Object getBiomeProvider(){return null;}
  public int getHeight(){return height;}
- public static class Storage {public Object getOrLoadData(Class<?> c,String name){return null;}}
- public Storage getPerWorldStorage(){return new Storage();}
+ public static class Storage {public final Map<String,Object> values=new HashMap<>(); public Object getOrLoadData(Class<?> c,String name){return values.get(name);}}
+ public Storage storage=new Storage();
+ public Storage getPerWorldStorage(){return storage;}
  public boolean setBlockState(BlockPos p,IBlockState s,int flags){
   writes.add(p);
   if(failFloor&&s.getBlock()!=Blocks.CHEST)return false;
