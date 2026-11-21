@@ -35,10 +35,11 @@ public final class LargeTowerEncounter {
         if (world == null || world.isRemote || !LargeWizardTower.supports(style) ||
                 world.getDifficulty() == EnumDifficulty.PEACEFUL) return false;
         BlockPos bossFeet = LargeWizardTower.bossFeet(x, y, z);
-        EntityTowerMage boss = MageRegistration.spawnTowerMage(world, bossFeet);
+        // Spawn callbacks can inspect or even kill the entity synchronously; mark it
+        // before publishing it to the world. Forge persists getEntityData on unload.
+        EntityTowerMage boss = MageRegistration.spawnTowerMage(world, bossFeet,
+            mage -> mage.getEntityData().setInteger(STYLE, style + 1));
         if (boss == null) return false;
-        // getEntityData is persisted by Forge across normal chunk unloads.
-        boss.getEntityData().setInteger(STYLE, style + 1);
         for (int floor = 0; floor < 5; floor++) {
             BlockPos feet = LargeWizardTower.guardFeet(x, y, z, floor);
             if (!world.isBlockLoaded(feet) || !world.isBlockLoaded(feet.up()) || !world.isBlockLoaded(feet.down())) continue;
