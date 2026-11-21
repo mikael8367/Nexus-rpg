@@ -14,7 +14,8 @@ public final class MagicModels {
     @SubscribeEvent
     public static void register(ModelRegistryEvent event) {
         for (Item item : new Item[] { MagicRegistry.ARCANE_STAFF, MagicRegistry.HEALING_STAFF,
-                MagicRegistry.WARD_STAFF, MagicRegistry.SWIFT_STAFF }) {
+                MagicRegistry.WARD_STAFF, MagicRegistry.SWIFT_STAFF, MagicRegistry.FLAMEWARD_STAFF,
+                MagicRegistry.NIGHTVISION_STAFF, MagicRegistry.WATERBREATHING_STAFF }) {
             ModelLoader.setCustomModelResourceLocation(item, 0,
                 new ModelResourceLocation(item.getRegistryName(), "inventory"));
         }
