@@ -21,6 +21,41 @@ import org.lwjgl.input.Keyboard;
 @Mod.EventBusSubscriber(modid=NexusRpg.MODID,value=Side.CLIENT)
 public final class CharacterClient {
     private static KeyBinding key; private static EntityPlayer player; private static net.minecraft.world.World world; private static boolean received, prompt;
+    // Survives screen closure and player replacement; belongs to the connection, not the GUI.
+    private static net.minecraft.client.network.NetHandlerPlayClient allocationConnection;
+    private static long allocationSequence;
+    private static int allocationStat, allocationTicks, allocationRetries;
+    private static boolean allocationPending, allocationBarrier, allocationStalled;
+    private static String allocationStatus="";
+    static boolean allocationPending() { return allocationPending; }
+    static boolean allocationStalled() { return allocationStalled; }
+    static String allocationStatus() { return allocationStatus; }
+    static void allocate(int stat) {
+        Minecraft mc=Minecraft.getMinecraft();
+        if(allocationPending || mc.player==null || mc.world==null || mc.getConnection()==null
+            || stat<0 || stat>=CharacterProfile.STATS.length
+            || (!allocationStalled && (!mc.player.isEntityAlive() || mc.player.isSpectator()
+                || allocationSequence>=Long.MAX_VALUE-1))) return;
+        if(allocationStalled) {
+            // Explicit retry is a read-only barrier, not another allocation.
+            if(allocationConnection!=mc.getConnection()) return;
+            allocationStalled=false; allocationPending=true; allocationTicks=0; allocationRetries=0;
+            allocationStatus="Tentando atualizar atributos...";
+            CharacterNetwork.requestAttribute(allocationSequence,-1);
+            return;
+        }
+        allocationConnection=mc.getConnection(); allocationSequence++; allocationStat=stat;
+        allocationTicks=0; allocationRetries=0; allocationBarrier=false; allocationPending=true; allocationStatus="";
+        CharacterNetwork.requestAttribute(allocationSequence,stat);
+    }
+    static void receiveAttribute(long sequence,boolean accepted,NBTTagCompound data) {
+        Minecraft mc=Minecraft.getMinecraft();
+        if(!allocationPending || allocationConnection!=mc.getConnection() || sequence!=allocationSequence || data==null) return;
+        boolean barrier=allocationBarrier;
+        allocationPending=false; allocationBarrier=false; allocationStalled=false;
+        receive(data);
+        allocationStatus=barrier ? "Resultado anterior incerto; atributos atualizados." : accepted ? "" : "Atributo não foi alocado.";
+    }
     private CharacterClient() {}
     static void init() { key=new KeyBinding("key.nexusrpg.character",Keyboard.KEY_K,"key.categories.nexusrpg"); ClientRegistry.registerKeyBinding(key); }
     static void receive(NBTTagCompound data) {
@@ -36,6 +71,28 @@ public final class CharacterClient {
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e) {
         if(e.phase!=TickEvent.Phase.END) return;
         Minecraft mc=Minecraft.getMinecraft();
+        if(allocationConnection!=null && allocationConnection!=mc.getConnection()) {
+            // Old-connection packets cannot affect the new server connection.
+            allocationConnection=null; allocationPending=false; allocationBarrier=false; allocationStalled=false;
+            allocationStatus="";
+        }
+        if(allocationPending && mc.player!=null && mc.world!=null && mc.getConnection()==allocationConnection
+            && ++allocationTicks>=40) {
+            allocationTicks=0;
+            // Retry exactly the same purchase. After a bounded number, supersede it with
+            // a read-only sequence barrier; never guess whether the purchase happened.
+            if(++allocationRetries>=3) {
+                if(!allocationBarrier && allocationSequence<Long.MAX_VALUE) {
+                    allocationSequence++; allocationStat=-1; allocationBarrier=true; allocationRetries=0;
+                    allocationStatus="Sem confirmação; aguardando atualização segura.";
+                } else {
+                    // No infinite active wait. The '?' controls explicitly retry the barrier.
+                    allocationPending=false; allocationStalled=true;
+                    allocationStatus="Sem resposta; toque ? para atualizar.";
+                }
+            }
+            if(allocationPending) CharacterNetwork.requestAttribute(allocationSequence,allocationStat);
+        }
         if(mc.player!=player || mc.world!=world) {
             player=mc.player; world=mc.world; received=false; prompt=false;
             if(player!=null && world!=null) CharacterNetwork.send(2,0);
