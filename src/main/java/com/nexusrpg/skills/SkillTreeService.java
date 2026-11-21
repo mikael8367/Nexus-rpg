@@ -15,13 +15,7 @@ public final class SkillTreeService {
             && p.getServer().isCallingFromMinecraftThread();
     }
     private static boolean profileValid(EntityPlayerMP p) {
-        NBTTagCompound root=p.getEntityData();
-        if(!root.hasKey(EntityPlayer.PERSISTED_NBT_TAG,10)) return false;
-        NBTTagCompound persist=root.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG);
-        if(!persist.hasKey("NexusRpgCharacter",10)) return false;
-        NBTTagCompound n=persist.getCompoundTag("NexusRpgCharacter");
-        return n.hasKey("class",8) && n.hasKey("level",3) && n.getInteger("level")>=1
-            && n.getInteger("level")<=1000000 && !SkillTree.nodes(n.getString("class")).isEmpty();
+        return CharacterProfile.hasValidSelectedProfile(p);
     }
     static boolean valid(NBTTagCompound data) {
         if(data==null || (data.hasKey(TREE) && !data.hasKey(TREE,10))) return false;
