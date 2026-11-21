@@ -37,7 +37,10 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
  */
 public final class NexusStructureGenerator implements IWorldGenerator {
     // Candidate rate, before biome, terrain and safety checks; not a guarantee.
-    private static final int CANDIDATE_CHANCE = 8;
+    private static final int CANDIDATE_CHANCE = 4;
+    // Towers get three tickets; every other design keeps one. Selection only
+    // happens after all terrain and protection checks, never by forcing a site.
+    private static final int TOWER_TICKETS = 3;
     // Reject thin cave roofs and thin floating shelves under the whole footprint.
     private static final int FOUNDATION_DEPTH = 5;
     // A live loaded chunk holds its own identity; weak keys do not retain unloaded chunks/worlds.
@@ -113,12 +116,12 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             for (int y = heights[dx + 4][dz + 4]; y <= max; y++)
                 put(plan, cx, y, cz, dx, 0, dz, floor);
         }
-        // Equal chance for the original and each design in this biome.
+        // One ticket per original/nova design, three for a supported tower.
         int[] first = {0, 7, 14, 20, 26, 32, 38, 44};
         int[] count = {7, 7, 6, 6, 6, 6, 6, 6};
         boolean eligibleTower = WizardTower.supports(style);
-        int choice = random.nextInt(count[style] + 1 + (eligibleTower ? 1 : 0));
-        boolean wizardTower = eligibleTower && choice == count[style] + 1;
+        int choice = random.nextInt(count[style] + 1 + (eligibleTower ? TOWER_TICKETS : 0));
+        boolean wizardTower = eligibleTower && choice >= count[style] + 1;
         if (choice == 0) {
             decorate(plan, cx, max, cz, style);
         } else {
