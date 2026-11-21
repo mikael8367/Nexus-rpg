@@ -20,6 +20,13 @@ public final class SkillTreeTest {
         String[] classes={"warrior","mage","archer","assassin","paladin","necromancer"};
         Set<String> ids=new HashSet<>();
         check(SkillTree.allNodes().size()==24,"24 nós");
+        check(SkillTree.allNodes()==SkillTree.allNodes(),"lista global compartilhada sem alocar");
+        check(SkillTree.nodes("mage")==SkillTree.nodes("mage"),"lista da classe compartilhada");
+        check(SkillTree.nodes(null).isEmpty() && SkillTree.nodes("missing").isEmpty(),"classes desconhecidas");
+        try { SkillTree.allNodes().clear(); throw new AssertionError("lista global mutável"); }
+        catch (UnsupportedOperationException expected) { }
+        try { SkillTree.nodes("mage").clear(); throw new AssertionError("lista da classe mutável"); }
+        catch (UnsupportedOperationException expected) { }
         for(String c:classes) {
             check(SkillTree.nodes(c).size()==4,"4 nós em "+c);
             for(SkillTree.Node n:SkillTree.nodes(c)) {
