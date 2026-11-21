@@ -13,6 +13,10 @@ public final class MagicRegistry {
     public static final Item WARD_STAFF = staff("ward_staff", ItemMagicStaff.Spell.WARD, 300);
     public static final Item SWIFT_STAFF = staff("swift_staff", ItemMagicStaff.Spell.SWIFT, 200);
 
+    public static final Item FLAMEWARD_STAFF = staff("flameward_staff", ItemMagicStaff.Spell.FLAMEWARD, 400);
+    public static final Item NIGHTVISION_STAFF = staff("nightvision_staff", ItemMagicStaff.Spell.NIGHTVISION, 400);
+    public static final Item WATERBREATHING_STAFF = staff("waterbreathing_staff", ItemMagicStaff.Spell.WATERBREATHING, 400);
+
     private MagicRegistry() {}
     private static Item staff(String name, ItemMagicStaff.Spell spell, int cooldown) {
         return new ItemMagicStaff(spell, cooldown).setRegistryName("nexusrpg", name)
@@ -20,6 +24,6 @@ public final class MagicRegistry {
     }
     @SubscribeEvent
     public static void register(RegistryEvent.Register<Item> event) {
-        event.getRegistry().registerAll(ARCANE_STAFF, HEALING_STAFF, WARD_STAFF, SWIFT_STAFF);
+        event.getRegistry().registerAll(ARCANE_STAFF, HEALING_STAFF, WARD_STAFF, SWIFT_STAFF, FLAMEWARD_STAFF, NIGHTVISION_STAFF, WATERBREATHING_STAFF);
     }
 }
