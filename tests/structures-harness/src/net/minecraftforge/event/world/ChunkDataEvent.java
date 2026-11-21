@@ -1,0 +1,2 @@
+package net.minecraftforge.event.world;
+import net.minecraft.world.World; import net.minecraft.world.chunk.Chunk; public class ChunkDataEvent { public static class Load { World w; Chunk c; public Load(World w,Chunk c){this.w=w;this.c=c;} public net.minecraft.nbt.NBTTagCompound getData(){return new net.minecraft.nbt.NBTTagCompound();} public World getWorld(){return w;} public Chunk getChunk(){return c;} } }
