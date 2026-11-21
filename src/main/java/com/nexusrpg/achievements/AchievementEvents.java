@@ -93,15 +93,19 @@ public final class AchievementEvents {
         if (candidate != null && !candidate.isCanceled() && candidate.getSource() == e.getSource())
             PENDING.confirm(e.getEntityLiving());
     }
+    // Reject corrupt/non-finite health instead of treating NaN as a death.
+    static boolean confirmedDeadHealth(float health) {
+        return !Float.isNaN(health) && !Float.isInfinite(health) && health <= 0.0F;
+    }
     @SubscribeEvent public static void serverTick(TickEvent.ServerTickEvent e) {
         if (e.phase != TickEvent.Phase.END) return;
         serverTicks++;
         for (LivingDeathEvent death : PENDING.drain(serverTicks)) {
             EntityLivingBase victim = death.getEntityLiving();
             Entity source = death.getSource().getTrueSource();
-            if (death.isCanceled() || victim.getHealth() > 0 || !(source instanceof EntityPlayerMP)) continue;
+            if (death.isCanceled() || !confirmedDeadHealth(victim.getHealth()) || !(source instanceof EntityPlayerMP)) continue;
             EntityPlayerMP p = (EntityPlayerMP)source;
-            if (!eligible(p) || p.getServer() == null || p.getServer().getPlayerList().getPlayerByUUID(p.getUniqueID()) != p
+            if (!eligible(p) || p.world != victim.world || p.getServer() == null || p.getServer().getPlayerList().getPlayerByUUID(p.getUniqueID()) != p
                     || !AchievementData.recordSkeleton(p.getEntityData(), victim.getUniqueID())) continue;
             announceSkeleton(p);
         }
