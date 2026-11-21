@@ -11,6 +11,7 @@ import net.minecraftforge.fml.common.registry.EntityEntry;
 import net.minecraftforge.fml.common.registry.EntityEntryBuilder;
 
 import javax.annotation.Nullable;
+import java.util.function.Consumer;
 
 /** Forge discovers the registration automatically; do not register a second time in preInit. */
 @Mod.EventBusSubscriber(modid = "nexusrpg")
@@ -41,6 +42,13 @@ public final class MageRegistration {
      */
     @Nullable
     public static EntityTowerMage spawnTowerMage(World world, BlockPos feet) {
+        return spawnTowerMage(world, feet, null);
+    }
+
+    /** Configure persistent encounter data before spawn events can observe the mage. */
+    @Nullable
+    public static EntityTowerMage spawnTowerMage(World world, BlockPos feet,
+                                                @Nullable Consumer<EntityTowerMage> beforeSpawn) {
         if (world == null || world.isRemote || feet == null || feet.getY() < 1 || feet.getY() > 253
                 || !world.isBlockLoaded(feet) || !world.isBlockLoaded(feet.up(2))
                 || !world.isBlockLoaded(feet.down())
@@ -51,6 +59,7 @@ public final class MageRegistration {
                 || world.containsAnyLiquid(mage.getEntityBoundingBox())
                 || !world.checkNoEntityCollision(mage.getEntityBoundingBox(), mage)) return null;
         mage.setHomePosAndDistance(feet, 16);
+        if (beforeSpawn != null) beforeSpawn.accept(mage);
         return world.spawnEntity(mage) ? mage : null;
     }
 }
