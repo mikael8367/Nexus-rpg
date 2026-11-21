@@ -14,6 +14,8 @@ public final class CharacterProfile {
     static final String KEY="NexusRpgCharacter";
     static final String[] CLASSES={"warrior","mage","archer","assassin","paladin","necromancer"};
     static final String[] STATS={"health","mana","strength","defense","speed","intelligence","luck"};
+    private static final String[] REQUIRED_FIELDS={"level","xp","points","mana"};
+    private static final String[] INTEGER_FIELDS={"level","xp","points","mana","stat_health","stat_mana","stat_strength","stat_defense","stat_speed","stat_intelligence","stat_luck"};
     // Starting points are class bonuses, not spendable allocations.
     private static final int[][] BONUS={{3,0,4,2,0,0,0},{0,5,0,0,0,4,0},{0,1,2,0,3,0,2},{0,0,3,0,4,0,2},{4,2,1,4,0,1,0},{1,4,0,1,0,3,1}};
     private static final UUID HEALTH=UUID.fromString("10709e2a-e6ce-4507-9da9-c88812139001"), SPEED=UUID.fromString("10709e2a-e6ce-4507-9da9-c88812139002"), LUCK=UUID.fromString("10709e2a-e6ce-4507-9da9-c88812139003");
@@ -39,18 +41,37 @@ public final class CharacterProfile {
         root(p); // ensure PlayerPersisted exists before installing the copy
         p.getEntityData().getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG).setTag(KEY,tag.copy());
     }
-    private static boolean server(EntityPlayer p) {
-        if (p==null || p.world==null || p.world.isRemote || !storageWritable(p)) return false;
-        NBTTagCompound n=root(p);
-        if (n.hasKey("class") && !n.hasKey("class",Constants.NBT.TAG_STRING)) return false;
-        String[] fields={"level","xp","points","mana","stat_health","stat_mana","stat_strength","stat_defense","stat_speed","stat_intelligence","stat_luck"};
-        for (String field:fields) {
+    // Validate the complete selected profile before any progression or skill mutation.
+    // Missing/unknown fields may be recoverable legacy or damaged data: never repair them implicitly.
+    static boolean validData(NBTTagCompound n) {
+        if (n==null) return false;
+        if (n.getKeySet().isEmpty()) return true;
+        if (!n.hasKey("class",Constants.NBT.TAG_STRING)) return false;
+        boolean known=false;
+        for (String c:CLASSES) if (c.equals(n.getString("class"))) { known=true; break; }
+        if (!known) return false;
+        for (String field:REQUIRED_FIELDS)
+            if (!n.hasKey(field,Constants.NBT.TAG_INT)) return false;
+        for (String field:INTEGER_FIELDS) {
             if (!n.hasKey(field)) continue;
             if (!n.hasKey(field,Constants.NBT.TAG_INT)) return false;
             int value=n.getInteger(field);
             if (value<0 || (field.equals("level") && (value<1 || value>1000000)) || (field.startsWith("stat_") && value>10000)) return false;
         }
         return true;
+    }
+    private static boolean server(EntityPlayer p) {
+        return p!=null && p.world!=null && !p.world.isRemote && storageWritable(p) && validData(root(p));
+    }
+    /** Read-only check for other server systems; does not create or change NBT. */
+    public static boolean hasValidSelectedProfile(EntityPlayer p) {
+        if (p==null || !storageWritable(p)) return false;
+        NBTTagCompound data=p.getEntityData();
+        if (!data.hasKey(EntityPlayer.PERSISTED_NBT_TAG,Constants.NBT.TAG_COMPOUND)) return false;
+        NBTTagCompound persisted=data.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG);
+        if (!persisted.hasKey(KEY,Constants.NBT.TAG_COMPOUND)) return false;
+        NBTTagCompound n=persisted.getCompoundTag(KEY);
+        return !n.getKeySet().isEmpty() && validData(n);
     }
     private static int index(EntityPlayer p) { String c=root(p).getString("class"); for(int i=0;i<CLASSES.length;i++) if(CLASSES[i].equals(c)) return i; return -1; }
     public static String characterClass(EntityPlayer p) { if(p==null) return ""; int i=index(p); return i<0?"":CLASSES[i]; }
