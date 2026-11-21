@@ -160,9 +160,16 @@ public final class ModBiomes {
 
         @Override
         public int getFoliageColorAtPos(BlockPos pos) {
-            if ("witching_mire".equals(id)) return 0x66575F;
-            if ("rosa_sanctum".equals(id)) return 0xD68BAB;
-            if ("umbral_reach".equals(id)) return 0x3B3345;
+            // Matches the key associated with each Nexus biome. Vanilla leaves
+            // with a fixed tint (such as spruce and birch) may ignore biome tint.
+            if ("enchanted_grove".equals(id)) return 0x36B86A;
+            if ("frost_crown".equals(id)) return 0x75D9E8;
+            if ("sunken_empire".equals(id)) return 0xD9A52B;
+            if ("witching_mire".equals(id)) return 0x7950A8;
+            if ("cinder_heart".equals(id)) return 0xD94B32;
+            if ("rosa_sanctum".equals(id)) return 0xE58BB8;
+            if ("umbral_reach".equals(id)) return 0x29243D;
+            if ("titan_canopy".equals(id)) return 0xE58A35;
             return super.getFoliageColorAtPos(pos);
         }
     }
