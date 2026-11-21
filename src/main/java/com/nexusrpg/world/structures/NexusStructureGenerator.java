@@ -30,7 +30,7 @@ import net.minecraftforge.fml.common.IWorldGenerator;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 /** Register ONE instance in preInit, before any worlds are opened.
- * Disk-loaded chunks are eligible only when their saved terrain is explicitly unpopulated.
+ * Chunks loaded from disk are never eligible, even if population was incomplete.
  */
 public final class NexusStructureGenerator implements IWorldGenerator {
     // A live loaded chunk holds its own identity; weak keys do not retain unloaded chunks/worlds.
@@ -44,15 +44,8 @@ public final class NexusStructureGenerator implements IWorldGenerator {
     @SubscribeEvent
     public void onChunkDataLoad(ChunkDataEvent.Load event) {
         if (!event.getWorld().isRemote) {
-            NBTTagCompound data = event.getData();
-            // Missing or malformed data is not proof that this chunk is safe to populate.
-            if (data == null || !data.hasKey("Level", 10)) {
-                loadedFromDisk.add(event.getChunk());
-                return;
-            }
-            NBTTagCompound level = data.getCompoundTag("Level");
-            if (!level.hasKey("TerrainPopulated", 1) || level.getBoolean("TerrainPopulated"))
-                loadedFromDisk.add(event.getChunk());
+            // Never retrofit a saved chunk, including partially populated ones.
+            loadedFromDisk.add(event.getChunk());
         }
     }
 
@@ -105,7 +98,26 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             for (int y = heights[dx + 4][dz + 4]; y <= max; y++)
                 put(plan, cx, y, cz, dx, 0, dz, floor);
         }
-        decorate(plan, cx, max, cz, style);
+        // Equal chance for the original and each design in this biome.
+        int[] first = {0, 7, 14, 20, 26, 32, 38, 44};
+        int[] count = {7, 7, 6, 6, 6, 6, 6, 6};
+        int choice = random.nextInt(count[style] + 1);
+        if (choice == 0) {
+            decorate(plan, cx, max, cz, style);
+        } else {
+            int design = first[style] + choice - 1;
+            Map<BlockPos, IBlockState> decoration = new LinkedHashMap<BlockPos, IBlockState>();
+            try {
+                if (design <= 16) NovaStructuresA.build(decoration, cx, max, cz, design, style);
+                else if (design <= 33) NovaStructuresB.build(decoration, cx, max, cz, design, style);
+                else NovaStructuresC.build(decoration, cx, max, cz, design, style);
+            } catch (IllegalArgumentException invalidPlan) {
+                return;
+            }
+            if (!validNewDecoration(decoration, cx, max, cz)) return;
+            plan.putAll(decoration);
+            if (!hasChestApproach(chunk, plan, cx, max, cz)) return;
+        }
         BlockPos chestPos = new BlockPos(cx, max + 1, cz);
         if (plan.containsKey(chestPos) || plan.containsKey(chestPos.up())) return;
         // Snapshot exact states, including plant/snow metadata, for conditional rollback.
@@ -124,6 +136,7 @@ public final class NexusStructureGenerator implements IWorldGenerator {
 
         List<BlockPos> attempted = new ArrayList<BlockPos>();
         boolean complete = false;
+        boolean attemptedChest = false;
         try {
             // Build first, chest last: a rejected floor cannot leave a floating chest.
             for (Map.Entry<BlockPos, IBlockState> entry : plan.entrySet()) {
@@ -147,27 +160,107 @@ public final class NexusStructureGenerator implements IWorldGenerator {
                 chunk.getBlockState(chestPos.up()).getBlock() != Blocks.AIR ||
                 chunk.getTileEntityMap().containsKey(chestPos) ||
                 chunk.getTileEntityMap().containsKey(chestPos.up())) return;
+            // Chest creation and loot assignment are part of the same guarded operation.
+            // A callback during chest placement can also invalidate earlier writes.
+            attemptedChest = true;
+            boolean placed = world.setBlockState(chestPos, Blocks.CHEST.getDefaultState(), 2);
+            if (chunkProvider.getLoadedChunk(chunkX, chunkZ) != chunk) return;
+            IBlockState chestState = chunk.getBlockState(chestPos);
+            TileEntity tile = chunk.getTileEntityMap().get(chestPos);
+            if (!placed || chestState.getBlock() != Blocks.CHEST || !(tile instanceof TileEntityChest) ||
+                chunk.getBlockState(chestPos.up()).getBlock() != Blocks.AIR ||
+                chunk.getTileEntityMap().containsKey(chestPos.up())) return;
+            for (Map.Entry<BlockPos, IBlockState> entry : plan.entrySet())
+                if (!chunk.getBlockState(entry.getKey()).equals(entry.getValue()) ||
+                    chunk.getTileEntityMap().containsKey(entry.getKey())) return;
+            ((TileEntityChest) tile).setLootTable(new ResourceLocation("nexusrpg", "chests/" + id(style)), random.nextLong());
+            tile.markDirty();
             complete = true;
         } finally {
-            if (!complete) rollback(world, chunkProvider, chunk, chunkX, chunkZ, plan, original, attempted);
+            if (!complete && chunkProvider.getLoadedChunk(chunkX, chunkZ) == chunk) {
+                // A chest with a tile (or any third-party block/tile) may own data: never
+                // remove it or its support. An exact tile-less chest has no inventory.
+                IBlockState state = chunk.getBlockState(chestPos);
+                TileEntity tile = chunk.getTileEntityMap().get(chestPos);
+                if (attemptedChest && tile == null && state.equals(Blocks.CHEST.getDefaultState()))
+                    world.setBlockState(chestPos, Blocks.AIR.getDefaultState(), 2);
+                if (chunkProvider.getLoadedChunk(chunkX, chunkZ) == chunk &&
+                    chunk.getBlockState(chestPos).getBlock() == Blocks.AIR &&
+                    !chunk.getTileEntityMap().containsKey(chestPos))
+                    rollback(world, chunkProvider, chunk, chunkX, chunkZ, plan, original, attempted);
+            }
         }
+    }
 
-        boolean placed = world.setBlockState(chestPos, Blocks.CHEST.getDefaultState(), 2);
-        if (chunkProvider.getLoadedChunk(chunkX, chunkZ) != chunk) return;
-        IBlockState chestState = chunk.getBlockState(chestPos);
-        TileEntity tile = chunk.getTileEntityMap().get(chestPos);
-        if (!placed || chestState.getBlock() != Blocks.CHEST || !(tile instanceof TileEntityChest)) {
-            // If no tile exists, remove only our exact chest state; never destroy another mod's tile.
-            if (tile == null && chestState.equals(Blocks.CHEST.getDefaultState()))
-                world.setBlockState(chestPos, Blocks.AIR.getDefaultState(), 2);
-            // Keep the platform if a chest remains: removing support could make it float.
-            if (chunkProvider.getLoadedChunk(chunkX, chunkZ) == chunk &&
-                chunk.getBlockState(chestPos).getBlock() != Blocks.CHEST)
-                rollback(world, chunkProvider, chunk, chunkX, chunkZ, plan, original, attempted);
-            return;
+    /** Reject malformed, unsafe or out-of-envelope additions before any world write. */
+    private static boolean validNewDecoration(Map<BlockPos, IBlockState> plan, int x, int y, int z) {
+        if (plan.isEmpty()) return false;
+        for (Map.Entry<BlockPos, IBlockState> entry : plan.entrySet()) {
+            BlockPos pos = entry.getKey();
+            IBlockState state = entry.getValue();
+            if (pos == null || state == null || Math.abs((long) pos.getX() - x) > 3 ||
+                Math.abs((long) pos.getZ() - z) > 3 || (long) pos.getY() - y < 1 || (long) pos.getY() - y > 10 ||
+                (pos.getX() == x && pos.getZ() == z && (long) pos.getY() - y <= 2) ||
+                state.getBlock().hasTileEntity(state) || !safeDecorationBlock(state.getBlock())) return false;
         }
-        ((TileEntityChest) tile).setLootTable(new ResourceLocation("nexusrpg", "chests/" + id(style)), random.nextLong());
-        tile.markDirty();
+        return true;
+    }
+
+    // Explicitly allow only inert, non-falling blocks used by these designs.
+    private static boolean safeDecorationBlock(Block b) {
+        return b == Blocks.STONEBRICK || b == Blocks.MOSSY_COBBLESTONE || b == Blocks.PLANKS ||
+            b == Blocks.COBBLESTONE || b == Blocks.SANDSTONE || b == Blocks.BRICK_BLOCK ||
+            b == Blocks.PRISMARINE || b == Blocks.LOG || b == Blocks.NETHER_BRICK ||
+            b == Blocks.OBSIDIAN || b == Blocks.QUARTZ_BLOCK || b == Blocks.PURPUR_BLOCK ||
+            b == Blocks.GLOWSTONE || b == Blocks.NETHERRACK || b == Blocks.END_BRICKS ||
+            b == Blocks.END_STONE || b == Blocks.RED_NETHER_BRICK || b == Blocks.IRON_BARS ||
+            b == Blocks.GLASS_PANE;
+    }
+
+    /** Two-block-high walk from a clear, reachable edge to a side of the chest. */
+    private static boolean hasChestApproach(Chunk chunk, Map<BlockPos, IBlockState> plan,
+                                            int x, int y, int z) {
+        boolean[][] seen = new boolean[7][7];
+        List<int[]> queue = new ArrayList<int[]>();
+        for (int d = -3; d <= 3; d++) {
+            addApproachStart(chunk, plan, x, y, z, -3, d, -4, d, seen, queue);
+            addApproachStart(chunk, plan, x, y, z, 3, d, 4, d, seen, queue);
+            addApproachStart(chunk, plan, x, y, z, d, -3, d, -4, seen, queue);
+            addApproachStart(chunk, plan, x, y, z, d, 3, d, 4, seen, queue);
+        }
+        int[] dx = {1, -1, 0, 0}, dz = {0, 0, 1, -1};
+        for (int i = 0; i < queue.size(); i++) {
+            int[] p = queue.get(i);
+            if (Math.abs(p[0]) + Math.abs(p[1]) == 1) return true;
+            for (int j = 0; j < 4; j++) {
+                int a = p[0] + dx[j], b = p[1] + dz[j];
+                if (a < -3 || a > 3 || b < -3 || b > 3 || (a == 0 && b == 0) ||
+                    seen[a + 3][b + 3] || !walkable(chunk, plan, x + a, y, z + b)) continue;
+                seen[a + 3][b + 3] = true;
+                queue.add(new int[] {a, b});
+            }
+        }
+        return false;
+    }
+    private static void addApproachStart(Chunk chunk, Map<BlockPos, IBlockState> plan, int x, int y, int z,
+                                         int a, int b, int outsideX, int outsideZ,
+                                         boolean[][] seen, List<int[]> queue) {
+        BlockPos ground = new BlockPos(x + outsideX, y - 1, z + outsideZ);
+        // Outside the raised platform, the surface must be at most one step down.
+        if (!seen[a + 3][b + 3] && isGround(chunk.getBlockState(ground).getBlock()) &&
+            walkable(chunk, plan, x + outsideX, y, z + outsideZ) &&
+            walkable(chunk, plan, x + a, y, z + b)) {
+            seen[a + 3][b + 3] = true;
+            queue.add(new int[] {a, b});
+        }
+    }
+    private static boolean walkable(Chunk chunk, Map<BlockPos, IBlockState> plan, int x, int y, int z) {
+        for (int h = 1; h <= 2; h++) {
+            BlockPos p = new BlockPos(x, y + h, z);
+            IBlockState state = plan.containsKey(p) ? plan.get(p) : chunk.getBlockState(p);
+            if (state.getBlock() != Blocks.AIR) return false;
+        }
+        return true;
     }
 
     /** Best effort: never load chunks or overwrite a block/tile changed by another mod. */
