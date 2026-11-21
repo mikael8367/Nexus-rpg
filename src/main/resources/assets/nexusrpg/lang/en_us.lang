@@ -117,3 +117,5 @@ entity.fire_dragon.name=Fire Dragon
 entity.water_dragon.name=Water Dragon
 entity.wind_dragon.name=Wind Dragon
 entity.earth_dragon.name=Earth Dragon
+
+item.nexusrpg.coal_recovery.name=Inert Recovery Package
