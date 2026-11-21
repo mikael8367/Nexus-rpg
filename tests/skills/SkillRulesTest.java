@@ -40,7 +40,7 @@ public final class SkillRulesTest {
         check(data.getLong("cast_mage") == 170 && data.getLong("ultimate_mage") == 1210
             && data.getLong("leech_ready") == 210 && data.getInteger("rank_mage") == 3,
             "death preserves cooldowns and rank");
-        // Exercise the exact copy used by the clone handler, including non-death clones.
+        // Exercise the snapshot and transient-combo rules; root-level backups are tested separately.
         NBTTagCompound source=new NBTTagCompound(), dest=new NBTTagCompound();
         source.setInteger("rank_warrior",2); source.setLong("cast_warrior",170);
         source.setLong("combo_start_warrior",10); source.setLong("combo_until_warrior",130);
@@ -51,18 +51,47 @@ public final class SkillRulesTest {
         NBTTagCompound destTree=new NBTTagCompound(); destTree.setString("future.data","kept");
         dest.setTag("tree_v1",destTree);
         NBTTagCompound sourceBefore=source.copy(), destBefore=dest.copy();
-        NBTTagCompound deathCopy=SkillEvents.cloneSkills(source,dest,true);
+        NBTTagCompound deathCopy=cloneSkills(source,dest,true);
         check(deathCopy.getInteger("rank_warrior")==2 && deathCopy.getLong("cast_warrior")==170, "old authoritative skills and timer");
         check(deathCopy.getCompoundTag("tree_v1").getInteger("warrior.active")==2
-            && deathCopy.getCompoundTag("tree_v1").getString("future.data").equals("kept")
-            && deathCopy.getString("unrelated_destination").equals("kept"),"preserve both sides' distinct tags");
+            && !deathCopy.getCompoundTag("tree_v1").hasKey("future.data")
+            && !deathCopy.hasKey("unrelated_destination"),"do not combine independently allocated snapshots");
         check(!deathCopy.hasKey("combo_until_warrior") && source.equals(sourceBefore) && dest.equals(destBefore),"death clears copied combos only");
-        check(SkillEvents.cloneSkills(source,null,false).getLong("combo_until_warrior")==130,"non-death clone retains combos");
+        check(cloneSkills(source,null,false).getLong("combo_until_warrior")==130,"non-death clone retains combos");
         source.setString("combo_until_warrior","corrupt");
-        check(SkillEvents.cloneSkills(source,null,true).equals(source),"malformed combo preserved through death");
+        check(cloneSkills(source,null,true).equals(source),"malformed combo preserved through death");
         check(Math.abs(SkillEvents.boostedDamage(100F,0.1F,2,1)-115F)<0.001F,"legacy and tree damage bonuses");
         check(SkillEvents.boostedDamage(Float.MAX_VALUE,0.15F,5,3)==Float.MAX_VALUE,"damage saturates, not infinity");
+        int successful=0;
+        for (int roll=0; roll<100; roll++) if (SkillEvents.dodgeRoll(400,400,roll)) successful++;
+        check(successful==15, "dodge exactly 15 percent");
+        check(!SkillEvents.dodgeRoll(399,400,0) && SkillEvents.dodgeRoll(400,400,0), "dodge cooldown boundary");
+        check(!SkillEvents.dodgeRoll(-1,0,0) && !SkillEvents.dodgeRoll(1,-1,0)
+            && !SkillEvents.dodgeRoll(Long.MAX_VALUE-399,0,0), "dodge invalid or overflowing ticks");
+        check(!SkillEvents.dodgeRoll(0,0,-1) && !SkillEvents.dodgeRoll(0,0,15), "dodge roll bounds");
+        check(SkillEvents.skillDamageSource(null,true).isFireDamage(), "mage fire source is elemental");
+        check(!SkillEvents.skillDamageSource(null,false).isFireDamage(), "ordinary source unchanged");
+        net.minecraft.util.DamageSource ordinary = new net.minecraft.util.DamageSource("test");
+        check(SkillEvents.dodgeSourceAllowed(ordinary, 1), "ordinary source eligible for further attacker checks");
+        check(!SkillEvents.dodgeSourceAllowed(null, 1) && !SkillEvents.dodgeSourceAllowed(ordinary, 0)
+            && !SkillEvents.dodgeSourceAllowed(ordinary, Float.NaN) && !SkillEvents.dodgeSourceAllowed(ordinary, Float.POSITIVE_INFINITY), "invalid amounts rejected");
+        check(!SkillEvents.dodgeSourceAllowed(new net.minecraft.util.DamageSource("test").setFireDamage(), 1)
+            && !SkillEvents.dodgeSourceAllowed(new net.minecraft.util.DamageSource("test").setMagicDamage(), 1)
+            && !SkillEvents.dodgeSourceAllowed(new net.minecraft.util.DamageSource("test").setExplosion(), 1)
+            && !SkillEvents.dodgeSourceAllowed(new net.minecraft.util.DamageSource("test").setDamageBypassesArmor(), 1)
+            && !SkillEvents.dodgeSourceAllowed(new net.minecraft.util.DamageSource("test").setDamageIsAbsolute(), 1), "special damage excluded");
+        NBTTagCompound cooldown=new NBTTagCompound(); cooldown.setLong("assassin_dodge_ready_v1",400);
+        check(cloneSkills(cooldown,null,true).getLong("assassin_dodge_ready_v1")==400,
+            "death preserves dodge cooldown");
         System.out.println("Skill rule checks passed");
+    }
+    private static NBTTagCompound cloneSkills(NBTTagCompound original, NBTTagCompound destination, boolean death) {
+        String persisted=net.minecraft.entity.player.EntityPlayer.PERSISTED_NBT_TAG, key="NexusRpgSkills";
+        NBTTagCompound sourceRoot=new NBTTagCompound(), sourcePersisted=new NBTTagCompound(), targetRoot=new NBTTagCompound();
+        sourcePersisted.setTag(key,original.copy()); sourceRoot.setTag(persisted,sourcePersisted);
+        if (destination!=null) { NBTTagCompound dp=new NBTTagCompound(); dp.setTag(key,destination.copy()); targetRoot.setTag(persisted,dp); }
+        SkillEvents.cloneSkillData(sourceRoot,targetRoot,death);
+        return targetRoot.getCompoundTag(persisted).getCompoundTag(key);
     }
     private static void check(boolean ok, String message) { if (!ok) throw new AssertionError(message); }
 }
