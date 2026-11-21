@@ -4,11 +4,23 @@ import com.nexusrpg.init.*; import net.minecraft.world.*; import net.minecraft.w
 public class NovaHarness {
  static int[] first={0,7,14,20,26,32,38,44}, count={7,7,6,6,6,6,6,6};
  static Biome[] bs={ModBiomes.ENCHANTED_GROVE,ModBiomes.FROST_CROWN,ModBiomes.SUNKEN_EMPIRE,ModBiomes.WITCHING_MIRE,ModBiomes.CINDER_HEART,ModBiomes.ROSA_SANCTUM,ModBiomes.UMBRAL_REACH,ModBiomes.TITAN_CANOPY};
- static class Pick extends Random {int choice;Pick(int c){choice=c;}public int nextInt(int n){return n==80?0:choice;}public long nextLong(){return 42;}}
+ static class Pick extends Random {int choice, calls;Pick(int c){choice=c;}public int nextInt(int n){if(calls++==0){ok(n==8,"candidate chance");return 0;}ok(choice<n,"choice bound");return choice;}public long nextLong(){return 42;}}
  static void ok(boolean b,String s){if(!b)throw new AssertionError(s);}
  static void build(Map<BlockPos,IBlockState> p,int id,int style){if(id<=16)NovaStructuresA.build(p,8,64,8,id,style);else if(id<=33)NovaStructuresB.build(p,8,64,8,id,style);else NovaStructuresC.build(p,8,64,8,id,style);}
  static void generate(Chunk c, World w, int choice){new NexusStructureGenerator().generate(new Pick(choice),c.x,c.z,w,null,(x,z)->x==c.x&&z==c.z?c:null);}
  public static void main(String[] a)throws Exception {
+  // Plants on a one-block higher natural ring do not obstruct walking, but used
+  // to make every approach fail even though no part of the ring is modified.
+  Chunk flowering=new Chunk(0,0,bs[0],64); World flowerWorld=new World(flowering);
+  for(int x=4;x<=12;x++)for(int z=4;z<=12;z++) {
+    if(x==4||x==12||z==4||z==12) {
+      flowering.h[x][z]=65;
+      flowering.overlay.put(new BlockPos(x,65,z),Blocks.RED_FLOWER.getDefaultState());
+    }
+  }
+  generate(flowering,flowerWorld,1);
+  ok(flowerWorld.getTileEntity(new BlockPos(8,65,8)) instanceof TileEntityChest,"passable flowers blocked every approach");
+  ok(flowering.getBlockState(new BlockPos(4,65,8)).getBlock()==Blocks.RED_FLOWER,"outside flowers overwritten");
   Method valid=NexusStructureGenerator.class.getDeclaredMethod("validNewDecoration",Map.class,int.class,int.class,int.class);valid.setAccessible(true);
   Method approach=NexusStructureGenerator.class.getDeclaredMethod("hasChestApproach",Chunk.class,Map.class,int.class,int.class,int.class);approach.setAccessible(true);
   Set<Set<BlockPos>> all=new HashSet<>(); int min=10000,max=0,total=0;
@@ -43,6 +55,33 @@ public class NovaHarness {
   Chunk saved=new Chunk(0,0,bs[0],64);saved.overlay.put(new BlockPos(5,30,5),Blocks.LOG.getDefaultState());World sw=new World(saved);generate(saved,sw,1);ok(sw.writes.isEmpty(),"modified terrain");
   Chunk disk=new Chunk(0,0,bs[0],64); World dw=new World(disk); NexusStructureGenerator dg=new NexusStructureGenerator(); dg.onChunkDataLoad(new net.minecraftforge.event.world.ChunkDataEvent.Load(dw,disk)); dg.generate(new Pick(1),0,0,dw,null,(x,z)->disk); ok(dw.writes.isEmpty(),"disk chunk");
   Chunk border=new Chunk(0,0,bs[0],64);World bw=new World(border);bw.border=false;generate(border,bw,1);ok(bw.writes.isEmpty(),"world border");
+  // Candidate outcomes: 0 attempts and 1..7 skip; dimensions, client, biome, unloaded chunk.
+  for(int roll=1;roll<8;roll++){
+    final int r=roll;Chunk c=new Chunk(0,0,bs[0],64);World w=new World(c);
+    new NexusStructureGenerator().generate(new Random(){public int nextInt(int n){ok(n==8,"wrong chance");return r;}},0,0,w,null,(x,z)->c);
+    ok(w.writes.isEmpty(),"chance skip "+roll);
+  }
+  Chunk dim=new Chunk(0,0,bs[0],64);World dimWorld=new World(dim);dimWorld.provider.dim=-1;generate(dim,dimWorld,1);ok(dimWorld.writes.isEmpty(),"nether");
+  dimWorld.provider.dim=1;generate(dim,dimWorld,1);ok(dimWorld.writes.isEmpty(),"end");
+  dimWorld.provider.dim=0;dimWorld.isRemote=true;generate(dim,dimWorld,1);ok(dimWorld.writes.isEmpty(),"client side");
+  Chunk other=new Chunk(0,0,new Biome(),64);World ow=new World(other);generate(other,ow,1);ok(ow.writes.isEmpty(),"non Nexus biome");
+  Chunk unloaded=new Chunk(0,0,bs[0],64);World uw=new World(unloaded);
+  new NexusStructureGenerator().generate(new Pick(1),0,0,uw,null,(x,z)->null);ok(uw.writes.isEmpty(),"unloaded chunk");
+  Chunk built=new Chunk(0,0,bs[0],64); World builtWorld=new World(built);
+  BlockPos chest=new BlockPos(5,64,5);built.overlay.put(chest,Blocks.CHEST.getDefaultState());built.tiles.put(chest,new TileEntityChest());
+  generate(built,builtWorld,1);ok(builtWorld.writes.isEmpty()&&built.tiles.containsKey(chest),"existing chest");
+  for(boolean overlap:new boolean[]{true,false}) {
+    Chunk c=new Chunk(0,0,bs[0],64);World w=new World(c);
+    net.minecraft.world.gen.structure.MapGenStructureData data=new net.minecraft.world.gen.structure.MapGenStructureData();
+    net.minecraft.nbt.NBTTagCompound start=new net.minecraft.nbt.NBTTagCompound();
+    start.put("BB",overlap?new int[]{2,0,2,15,100,15}:new int[]{100,0,100,120,100,120});
+    data.features.put("start",start);w.storage.values.put("Village",data);generate(c,w,1);
+    ok(overlap?w.writes.isEmpty():!w.writes.isEmpty(),"vanilla bounding box overlap="+overlap);
+  }
+  Chunk malformed=new Chunk(0,0,bs[0],64);World mw=new World(malformed);
+  net.minecraft.world.gen.structure.MapGenStructureData data=new net.minecraft.world.gen.structure.MapGenStructureData();
+  data.features.put("bad",new net.minecraft.nbt.NBTTagCompound());mw.storage.values.put("Village",data);
+  generate(malformed,mw,1);ok(mw.writes.isEmpty(),"malformed bounds must fail closed");
   // A chest failure with no tile should undo our exact writes, including exceptions.
   for(String mode:new String[]{"falseBefore","throwBefore","falseNoTile","throwAfterNoTile"}){
     Chunk c=new Chunk(0,0,bs[0],64); World w=new World(c);w.chestFailure=mode;
