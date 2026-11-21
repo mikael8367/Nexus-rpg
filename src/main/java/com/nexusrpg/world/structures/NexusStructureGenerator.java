@@ -137,8 +137,10 @@ public final class NexusStructureGenerator implements IWorldGenerator {
             }
             if (!validNewDecoration(decoration, cx, max, cz)) return;
             plan.putAll(decoration);
-            if (!hasChestApproach(chunk, plan, cx, max, cz)) return;
         }
+        // Original designs also need a reachable chest; the surrounding ring may
+        // be too low even when the platform's own foundation is flat and safe.
+        if (!hasChestApproach(chunk, plan, cx, max, cz)) return;
         BlockPos chestPos = new BlockPos(cx, max + 1, cz);
         if (plan.containsKey(chestPos) || plan.containsKey(chestPos.up())) return;
         // Cover the full footprint and all possible planned heights, including slopes.
