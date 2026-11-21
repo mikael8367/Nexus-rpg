@@ -9,3 +9,4 @@ find src/main/java/com/nexusrpg/world/structures -maxdepth 1 -name '*.java' -pri
 "${JAVA_HOME:+$JAVA_HOME/bin/}javac" -source 8 -target 8 -d "$dir" @"$dir/sources"
 "${JAVA_HOME:+$JAVA_HOME/bin/}java" -cp "$dir" com.nexusrpg.world.structures.NovaHarness
 "${JAVA_HOME:+$JAVA_HOME/bin/}java" -cp "$dir" com.nexusrpg.world.structures.WizardTowerHarness
+"${JAVA_HOME:+$JAVA_HOME/bin/}java" -cp "$dir" com.nexusrpg.world.structures.SurfaceSafetyHarness
