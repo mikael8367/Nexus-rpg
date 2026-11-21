@@ -36,6 +36,10 @@ gradlew.bat build
 
 O JAR será gerado em `build/libs/`.
 
+## Caçadas
+
+Consulte [CACADAS.md](CACADAS.md) para comandos, objetivos, recompensas e limitações das caçadas experimentais.
+
 ## Estrutura
 
 - `com.nexusrpg.NexusRpg`: classe principal e ciclo de vida do mod.

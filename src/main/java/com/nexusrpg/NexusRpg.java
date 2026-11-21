@@ -58,6 +58,7 @@ public class NexusRpg {
     @Mod.EventHandler
     public void serverStarting(net.minecraftforge.fml.common.event.FMLServerStartingEvent event) {
         event.registerServerCommand(new com.nexusrpg.quests.ZombieHunt.HuntCommand());
+        event.registerServerCommand(new com.nexusrpg.quests.TrailHunts.TrailCommand());
     }
 
     @Mod.EventHandler
