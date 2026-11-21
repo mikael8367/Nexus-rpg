@@ -1,0 +1,11 @@
+{
+  "pools": [
+    {"name": "bramble_common", "rolls": 1, "entries": [
+      {"type": "item", "name": "minecraft:string", "weight": 1,
+       "functions": [{"function": "minecraft:set_count", "count": {"min": 1, "max": 2}}]}
+    ]},
+    {"name": "bramble_extra", "rolls": 1, "conditions": [
+      {"condition": "minecraft:random_chance", "chance": 0.25}
+    ], "entries": [{"type": "item", "name": "minecraft:wheat_seeds", "weight": 1}]}
+  ]
+}
