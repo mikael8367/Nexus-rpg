@@ -50,6 +50,10 @@ public class World {
    chestFailure="";
    chunk.overlay.put(new BlockPos((chunk.x << 4)+8,65,(chunk.z << 4)+8),Blocks.CHEST.getDefaultState());
   }
+  if(chestFailure.equals("foreignPlan") && s.getBlock()!=Blocks.AIR) {
+   chestFailure="";
+   chunk.overlay.put(mutation,Blocks.LOG.getDefaultState());
+  }
   return true;
  }
  public TileEntity getTileEntity(BlockPos p){return chunk.tiles.get(p);}

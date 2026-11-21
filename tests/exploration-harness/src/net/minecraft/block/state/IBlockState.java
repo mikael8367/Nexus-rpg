@@ -1,0 +1,1 @@
+package net.minecraft.block.state; import net.minecraft.block.Block; public class IBlockState { final Block b; public IBlockState(Block b){this.b=b;} public Block getBlock(){return b;} public boolean equals(Object o){return o instanceof IBlockState && ((IBlockState)o).b==b;} public int hashCode(){return b.hashCode();}}

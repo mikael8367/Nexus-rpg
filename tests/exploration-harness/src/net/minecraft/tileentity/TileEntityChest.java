@@ -1,0 +1,2 @@
+package net.minecraft.tileentity;
+import net.minecraft.util.ResourceLocation; public class TileEntityChest extends TileEntity { public ResourceLocation loot; public long seed; public void setLootTable(ResourceLocation l,long s){loot=l;seed=s;} }

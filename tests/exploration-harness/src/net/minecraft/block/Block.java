@@ -1,0 +1,2 @@
+package net.minecraft.block;
+import net.minecraft.block.state.IBlockState; public class Block { public final String name; public Block(String n){name=n;} public IBlockState getDefaultState(){return new IBlockState(this);} public IBlockState getStateFromMeta(int i){return new IBlockState(this);} public boolean hasTileEntity(IBlockState s){return name.equals("CHEST")||name.equals("TILE");} public String toString(){return name;} }
