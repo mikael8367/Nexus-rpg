@@ -8,6 +8,9 @@ import net.minecraft.nbt.NBTTagCompound;
 import org.lwjgl.input.Mouse;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.advancements.GuiScreenAdvancements;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.biome.Biome;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.resources.I18n;
@@ -29,7 +32,11 @@ final class CharacterRpgScreen extends GuiScreen {
     private final int skillSession = ++nextSession;
     private static final int BUY_ID = 300, REFRESH_ID = 301, UP_ID = 302, DOWN_ID = 303;
     private static final int PREV_SKILL_ID = 304, NEXT_SKILL_ID = 305, PREV_STATS_ID = 400, NEXT_STATS_ID = 401;
-    private int skillSequence, pendingTicks, refreshTicks, detailScroll, statOffset, statRows;
+    private static final int CAST_ID = 500, ULTIMATE_ID = 501;
+    private static final int MAP_UP_ID = 600, MAP_DOWN_ID = 601, ADVANCEMENTS_ID = 602;
+    private static final int PAGE_UP_ID = 603, PAGE_DOWN_ID = 604;
+    private int skillSequence, pendingTicks, pendingRetries, pendingNode, refreshTicks, detailScroll, statOffset, statRows, mapScroll;
+    private int characterOffset, equipmentOffset;
     private boolean compactSkills() { return height < 210; }
     private boolean requested, pending, pendingBuy;
     private NBTTagCompound skillData;
@@ -53,9 +60,32 @@ final class CharacterRpgScreen extends GuiScreen {
         for (int i = 0; i < TAB_COUNT; i++) {
             int x1 = left + (i % 4) * panelWidth / 4;
             int x2 = left + (i % 4 + 1) * panelWidth / 4;
-            GuiButton b = new GuiButton(TAB_ID + i, x1, tabsTop + (i / 4) * 22, x2 - x1 - 2, 20, names[i]);
+            int buttonWidth = Math.max(1, x2 - x1 - 2);
+            GuiButton b = new GuiButton(TAB_ID + i, x1, tabsTop + (i / 4) * 22, buttonWidth, 20,
+                fontRenderer.trimStringToWidth(names[i], Math.max(1, buttonWidth - 8)));
             b.enabled = i != tab;
             buttonList.add(b);
+        }
+        if (tab == 0) characterOffset = Math.max(0, Math.min(characterOffset, 6 - contentRows()));
+        if (tab == 3) equipmentOffset = Math.max(0, Math.min(equipmentOffset, SLOTS.length - contentRows()));
+        // Chat commands still work on short screens where these controls would overlap text.
+        if (tab == 0 && height >= 212) {
+            int half = Math.max(30, (panelWidth - 18) / 2);
+            buttonList.add(new GuiButton(CAST_ID, left + 6, tabsTop - 22, half, 20, text("Ativa", "Active")));
+            buttonList.add(new GuiButton(ULTIMATE_ID, left + 10 + half, tabsTop - 22, half, 20, text("Suprema", "Ultimate")));
+        }
+        if ((tab == 0 && height < 212) || (tab == 3 && height < 218)) {
+            int rows = contentRows();
+            int offset = tab == 0 ? characterOffset : equipmentOffset;
+            int total = tab == 0 ? 6 : SLOTS.length;
+            offset = Math.max(0, Math.min(offset, Math.max(0, total - rows)));
+            if (tab == 0) characterOffset = offset; else equipmentOffset = offset;
+            if (rows > 0) {
+                GuiButton prev = new GuiButton(PAGE_UP_ID, left + 6, tabsTop - 22, 40, 20, "^");
+                GuiButton next = new GuiButton(PAGE_DOWN_ID, left + panelWidth - 46, tabsTop - 22, 40, 20, "v");
+                prev.enabled = offset > 0; next.enabled = offset + rows < total;
+                buttonList.add(prev); buttonList.add(next);
+            }
         }
         if (tab == 1) {
             boolean pages = 43 + CharacterProfile.STATS.length * 20 > tabsTop;
@@ -86,9 +116,30 @@ final class CharacterRpgScreen extends GuiScreen {
                 buttonList.add(new GuiButton(DOWN_ID, left + panelWidth - 20, 123, 16, 18, "v"));
             }
         }
+        if (tab == 5 && tabsTop >= 58) {
+            buttonList.add(new GuiButton(MAP_UP_ID, left + 6, tabsTop - 22, 40, 20, "^"));
+            buttonList.add(new GuiButton(MAP_DOWN_ID, left + panelWidth - 46, tabsTop - 22, 40, 20, "v"));
+        }
+        if (tab == 6 && tabsTop >= 75) {
+            GuiButton advancements = new GuiButton(ADVANCEMENTS_ID, left + 6, 47, Math.max(1, panelWidth - 12), 20,
+                fontRenderer.trimStringToWidth(text("Abrir progressos do Minecraft", "Open Minecraft advancements"), Math.max(1, panelWidth - 20)));
+            advancements.enabled = mc.getConnection() != null;
+            buttonList.add(advancements);
+        }
         if (!requested && mc.player != null) { requested = true; requestSkill(-1); }
         updateStatsButtons();
         updateSkillButtons();
+        updateCastButtons();
+    }
+    private int contentRows() {
+        if (tab == 0) return height >= 212 ? 6 : Math.max(0, (tabsTop - 22 - 35) / 20);
+        return height >= 218 ? SLOTS.length : Math.max(0, (tabsTop - 22 - 41) / 22);
+    }
+    private void updateCastButtons() {
+        for (GuiButton b : buttonList)
+            if (b.id == CAST_ID || b.id == ULTIMATE_ID)
+                b.enabled = mc.player != null && mc.getConnection() != null
+                    && mc.player.isEntityAlive() && !mc.player.isSpectator();
     }
     private void updateStatsButtons() {
         if (mc.player == null) return;
@@ -96,11 +147,33 @@ final class CharacterRpgScreen extends GuiScreen {
             int stat = b.id - STAT_ID;
             if (stat >= 0 && stat < CharacterProfile.STATS.length) {
                 int allocated = CharacterProfile.root(mc.player).getInteger("stat_" + CharacterProfile.STATS[stat]);
-                b.enabled = CharacterProfile.points(mc.player) > 0 && allocated >= 0 && allocated < 10000;
+                b.displayString = CharacterClient.allocationStalled() ? "?" : "+";
+                b.enabled = !CharacterClient.allocationPending() && mc.getConnection() != null
+                    && (CharacterClient.allocationStalled() || (mc.player.isEntityAlive() && !mc.player.isSpectator()
+                    && CharacterProfile.points(mc.player) > 0 && allocated >= 0 && allocated < 10000));
             }
         }
     }
     @Override protected void actionPerformed(GuiButton button) throws IOException {
+        if (tab == 0 && button.enabled && (button.id == CAST_ID || button.id == ULTIMATE_ID)) {
+            CharacterNetwork.send(button.id == CAST_ID ? 3 : 4, 0);
+            // The server reports activation, target and cooldown in chat.
+            mc.displayGuiScreen(null);
+            return;
+        }
+        if (tab == 6 && button.id == ADVANCEMENTS_ID && button.enabled && mc.getConnection() != null) {
+            mc.displayGuiScreen(new GuiScreenAdvancements(mc.getConnection().getAdvancementManager()));
+            return;
+        }
+        if (tab == 5 && button.enabled && (button.id == MAP_UP_ID || button.id == MAP_DOWN_ID)) {
+            mapScroll = Math.max(0, mapScroll + (button.id == MAP_UP_ID ? -1 : 1));
+            return;
+        }
+        if ((tab == 0 || tab == 3) && button.enabled && (button.id == PAGE_UP_ID || button.id == PAGE_DOWN_ID)) {
+            int delta = button.id == PAGE_UP_ID ? -1 : 1;
+            if (tab == 0) characterOffset += delta; else equipmentOffset += delta;
+            initGui(); return;
+        }
         int index = button.id - TAB_ID;
         if (index >= 0 && index < TAB_COUNT) {
             tab = index;
@@ -122,8 +195,10 @@ final class CharacterRpgScreen extends GuiScreen {
             return;
         }
         index = button.id - STAT_ID;
-        if (tab == 1 && index >= 0 && index < CharacterProfile.STATS.length && button.enabled)
-            CharacterNetwork.send(1, index);
+        if (tab == 1 && index >= 0 && index < CharacterProfile.STATS.length && button.enabled) {
+            CharacterClient.allocate(index);
+            updateStatsButtons();
+        }
         else if (tab == 2 && button.enabled && button.id == BUY_ID) {
             SkillTree.Node n = SkillTree.node(selectedSkill);
             if (n != null) requestSkill(SkillTree.allNodes().indexOf(n));
@@ -137,13 +212,22 @@ final class CharacterRpgScreen extends GuiScreen {
             skillOwner = mc.player; skillData = null; pending = false; pendingBuy = false;
             selectedSkill = null; skillSequence++; refreshTicks = 40;
         }
-        if (pending && ++pendingTicks > 100) {
-            skillMessage = pendingBuy ? text("Resposta não recebida; compra pode ter ocorrido. Atualizando.", "No response; purchase may have succeeded. Refreshing.")
-                : text("Sem resposta do servidor; tentando novamente.", "No server response; retrying.");
-            pending = false; skillData = null;
-            if (tab == 2) requestSkill(-1);
+        if (pending && ++pendingTicks > 40) {
+            pendingTicks=0;
+            if (++pendingRetries <= 3 && mc.player!=null && mc.getConnection()!=null) {
+                // Same token, never a fresh purchase: safe if the first reply was lost.
+                CharacterNetwork.requestSkills(skillSession,skillSequence,pendingNode);
+            } else {
+                skillMessage = pendingBuy ? text("Resposta não recebida; compra pode ter ocorrido. Atualizando.", "No response; purchase may have succeeded. Refreshing.")
+                    : text("Sem resposta do servidor; tentando novamente.", "No server response; retrying.");
+                pending = false; skillData = null;
+                // Higher sequence is a read-only barrier against delayed older requests.
+                if (tab == 2) requestSkill(-1);
+            }
         } else if (tab == 2 && !pending && ++refreshTicks >= 40) requestSkill(-1);
         updateSkillButtons();
+        updateCastButtons();
+        for (GuiButton b : buttonList) if (b.id == ADVANCEMENTS_ID) b.enabled = mc.getConnection() != null;
     }
     @Override public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         drawDefaultBackground();
@@ -154,22 +238,82 @@ final class CharacterRpgScreen extends GuiScreen {
         else if (tab == 1) drawAttributes(p);
         else if (tab == 2) drawSkills();
         else if (tab == 3) drawEquipment(p);
+        else if (tab == 5) drawMap(p);
+        else if (tab == 6) drawAdvancements();
         else drawCenteredString(fontRenderer, text("Ainda não disponível", "Not yet available"), width / 2, 60, 0xAAAAAA);
         super.drawScreen(mouseX, mouseY, partialTicks);
         if (tab == 3) equipmentTooltip(p, mouseX, mouseY);
     }
+    // This is a live location readout, not a rendered map or a chunk search.
+    private void drawMap(EntityPlayer p) {
+        List<String> lines = new ArrayList<>();
+        if (mc.world == null || p.world != mc.world) {
+            lines.add(text("Mundo indisponível.", "World unavailable."));
+        } else {
+            BlockPos pos = p.getPosition();
+            lines.add(text("Posição em blocos:", "Position in blocks:"));
+            lines.add("X: " + pos.getX() + "   Y: " + pos.getY() + "   Z: " + pos.getZ());
+            lines.add(text("Dimensão: ", "Dimension: ") + mc.world.provider.getDimensionType().getName()
+                + " (ID " + mc.world.provider.getDimension() + ")");
+            String biomeName = text("indisponível", "unavailable");
+            // Read the received chunk biome byte directly: getBiome() can invent a
+            // plains fallback when the byte is 255, and even cache that fallback.
+            if (mc.world.isBlockLoaded(pos, false)) {
+                byte[] biomes = mc.world.getChunkFromBlockCoords(pos).getBiomeArray();
+                int index = ((pos.getZ() & 15) << 4) | (pos.getX() & 15);
+                if (biomes != null && index < biomes.length) {
+                    int id = biomes[index] & 255;
+                    Biome biome = id == 255 ? null : Biome.getBiome(id);
+                    if (biome != null) biomeName = biome.getBiomeName();
+                }
+            }
+            lines.add(text("Bioma: ", "Biome: ") + biomeName);
+            lines.add(text("Dados locais; sem mapa de terreno.", "Local data; no terrain map."));
+        }
+        List<String> wrapped = new ArrayList<>();
+        for (String line : lines) wrapped.addAll(fontRenderer.listFormattedStringToWidth(line, Math.max(1, panelWidth - 16)));
+        int bottom = tabsTop >= 58 ? tabsTop - 22 : tabsTop;
+        int rows = Math.max(0, (bottom - 26) / 10);
+        mapScroll = Math.max(0, Math.min(mapScroll, Math.max(0, wrapped.size() - rows)));
+        for (int i = 0; i < rows && mapScroll + i < wrapped.size(); i++)
+            drawString(fontRenderer, wrapped.get(mapScroll + i), left + 8, 26 + i * 10, 0xFFFFFF);
+        for (GuiButton b : buttonList) {
+            if (b.id == MAP_UP_ID) b.enabled = mapScroll > 0;
+            else if (b.id == MAP_DOWN_ID) b.enabled = rows > 0 && mapScroll + rows < wrapped.size();
+        }
+    }
+    private void drawAdvancements() {
+        String label = mc.getConnection() == null ? text("Sem conexão com o servidor.", "No server connection.")
+            : text("Progressos existentes do Minecraft", "Existing Minecraft advancements");
+        drawString(fontRenderer, fontRenderer.trimStringToWidth(label, Math.max(1, panelWidth - 16)), left + 8, 27, 0xFFFFFF);
+        if (tabsTop >= 90) drawString(fontRenderer, fontRenderer.trimStringToWidth(
+            text("A tela padrão fecha este menu.", "The standard screen closes this menu."), Math.max(1, panelWidth - 16)),
+            left + 8, 73, 0xAAAAAA);
+    }
     private void drawCharacter(EntityPlayer p) {
-        int y = 35, x = left + 8;
+        int x = left + 8;
         String cls = CharacterProfile.characterClass(p);
-        drawString(fontRenderer, text("Classe: ", "Class: ") + tr("class." + cls), x, y, 0xFFFFFF); y += 20;
-        drawString(fontRenderer, tr("level", CharacterProfile.level(p)), x, y, 0xFFFFFF); y += 20;
-        drawString(fontRenderer, tr("xp", CharacterProfile.xp(p), CharacterProfile.xpForNextLevel(p)), x, y, 0xFFFFFF); y += 20;
-        drawString(fontRenderer, tr("points", CharacterProfile.points(p)), x, y, 0xFFFFFF); y += 20;
-        drawString(fontRenderer, tr("mana_display", CharacterProfile.mana(p), CharacterProfile.maxMana(p)), x, y, 0x66CCFF); y += 20;
-        drawString(fontRenderer, text("Vida: ", "Health: ") + String.format(java.util.Locale.ROOT, "%.1f / %.1f", p.getHealth(), p.getMaxHealth()), x, y, 0xFFAAAA);
+        String[] lines = { text("Classe: ", "Class: ") + tr("class." + cls),
+            tr("level", CharacterProfile.level(p)), tr("xp", CharacterProfile.xp(p), CharacterProfile.xpForNextLevel(p)),
+            tr("points", CharacterProfile.points(p)), tr("mana_display", CharacterProfile.mana(p), CharacterProfile.maxMana(p)),
+            text("Vida: ", "Health: ") + String.format(java.util.Locale.ROOT, "%.1f / %.1f", p.getHealth(), p.getMaxHealth()) };
+        for (int i = characterOffset; i < Math.min(lines.length, characterOffset + contentRows()); i++) {
+            int y = 35 + (i - characterOffset) * 20;
+            int color = i == 4 ? 0x66CCFF : i == 5 ? 0xFFAAAA : 0xFFFFFF;
+            drawString(fontRenderer, fontRenderer.trimStringToWidth(lines[i], Math.max(1, panelWidth - 16)), x, y, color);
+            if (i == 2) {
+                int barWidth = Math.max(0, panelWidth - 16);
+                int needed = CharacterProfile.xpForNextLevel(p);
+                int filled = needed <= 0 ? 0 : (int)(barWidth * Math.min(1.0D, (double)CharacterProfile.xp(p) / needed));
+                drawRect(x, y + 11, x + barWidth, y + 15, 0xFF333333);
+                drawRect(x, y + 11, x + filled, y + 15, 0xFF55CC66);
+            }
+        }
     }
     private void drawAttributes(EntityPlayer p) {
         drawString(fontRenderer, tr("points", CharacterProfile.points(p)), left + 8, 27, 0xFFFFAA);
+        if (!CharacterClient.allocationStatus().isEmpty())
+            drawString(fontRenderer, fontRenderer.trimStringToWidth(CharacterClient.allocationStatus(), Math.max(1,panelWidth-16)), left+8, tabsTop-11, 0xFFCC88);
         for (int i = statOffset; i < Math.min(CharacterProfile.STATS.length, statOffset + statRows); i++) {
             String stat = CharacterProfile.STATS[i];
             drawString(fontRenderer, fontRenderer.trimStringToWidth(tr("stat." + stat) + ": " + CharacterProfile.stat(p, stat), panelWidth - 45), left + 8, 49 + (i-statOffset) * 20, 0xFFFFFF);
@@ -178,7 +322,7 @@ final class CharacterRpgScreen extends GuiScreen {
     private void requestSkill(int nodeIndex) {
         if (mc.player == null || mc.getConnection() == null) return;
         skillOwner = mc.player;
-        pending = true; pendingBuy = nodeIndex >= 0; pendingTicks = 0; refreshTicks = 0;
+        pending = true; pendingBuy = nodeIndex >= 0; pendingTicks = 0; pendingRetries = 0; pendingNode = nodeIndex; refreshTicks = 0;
         if (pendingBuy) skillMessage = "";
         CharacterNetwork.requestSkills(skillSession, ++skillSequence, nodeIndex);
         updateSkillButtons();
@@ -317,10 +461,13 @@ final class CharacterRpgScreen extends GuiScreen {
         super.handleMouseInput();
         int wheel=Mouse.getEventDWheel();
         if (tab==2 && wheel!=0) detailScroll=Math.max(0,detailScroll+(wheel<0?1:-1));
+        if (tab==5 && wheel!=0) mapScroll=Math.max(0,mapScroll+(wheel<0?1:-1));
     }
     @Override protected void keyTyped(char typed,int key) throws IOException {
         if (tab==2 && key==org.lwjgl.input.Keyboard.KEY_DOWN) { detailScroll++; return; }
         if (tab==2 && key==org.lwjgl.input.Keyboard.KEY_UP) { detailScroll=Math.max(0,detailScroll-1); return; }
+        if (tab==5 && key==org.lwjgl.input.Keyboard.KEY_DOWN) { mapScroll++; return; }
+        if (tab==5 && key==org.lwjgl.input.Keyboard.KEY_UP) { mapScroll=Math.max(0,mapScroll-1); return; }
         super.keyTyped(typed,key);
     }
     private String slotName(int i) {
@@ -330,8 +477,8 @@ final class CharacterRpgScreen extends GuiScreen {
     }
     private void drawEquipment(EntityPlayer p) {
         drawString(fontRenderer, text("Somente leitura", "Read only"), left + 8, 26, 0xAAAAAA);
-        for (int i = 0; i < SLOTS.length; i++) {
-            int y = 41 + i * 22;
+        for (int i = equipmentOffset; i < Math.min(SLOTS.length, equipmentOffset + contentRows()); i++) {
+            int y = 41 + (i - equipmentOffset) * 22;
             ItemStack stack = p.getItemStackFromSlot(SLOTS[i]);
             if (!stack.isEmpty()) {
                 GlStateManager.enableRescaleNormal();
@@ -346,8 +493,8 @@ final class CharacterRpgScreen extends GuiScreen {
         }
     }
     private void equipmentTooltip(EntityPlayer p, int x, int y) {
-        for (int i = 0; i < SLOTS.length; i++) {
-            int rowY = 41 + i * 22;
+        for (int i = equipmentOffset; i < Math.min(SLOTS.length, equipmentOffset + contentRows()); i++) {
+            int rowY = 41 + (i - equipmentOffset) * 22;
             ItemStack stack = p.getItemStackFromSlot(SLOTS[i]);
             if (!stack.isEmpty() && x >= left + 8 && x < left + panelWidth - 4 && y >= rowY && y < rowY + 18) {
                 renderToolTip(stack, x, y); return;

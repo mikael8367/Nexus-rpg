@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.network.NetHandlerPlayServer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.network.ByteBufUtils;
@@ -31,6 +32,33 @@ public final class CharacterNetwork {
         Integer count=QUEUED.get(p);
         if(count==null || count<=1) QUEUED.remove(p); else QUEUED.put(p,count-1);
     }
+    // One bounded replay record per live connection. Never key by EntityPlayerMP:
+    // Forge replaces that object on respawn/dimension travel while retaining the connection.
+    private static final Map<NetHandlerPlayServer, ReplayState> REPLAY = new WeakHashMap<>();
+    static final class ReplayState {
+        int session, sequence, node;
+        String result = "";
+        long attributeSequence;
+        int attributeStat;
+        boolean attributeResult;
+        // A new session supersedes old screens; gaps are permitted so timeout barriers work.
+        int skill(int s, int q, int n) {
+            if (s <= 0 || q <= 0 || s < session || (s == session && q < sequence)) return -1;
+            if (s == session && q == sequence) return n == node ? 0 : -1;
+            session=s; sequence=q; node=n; result="Solicitação interrompida; atualize as habilidades."; return 1;
+        }
+        int attribute(long q, int stat) {
+            if (q <= 0 || q < attributeSequence) return -1;
+            if (q == attributeSequence) return stat==attributeStat ? 0 : -1;
+            attributeSequence=q; attributeStat=stat; attributeResult=false; return 1;
+        }
+    }
+    // Access only on the server thread; keys are weak and values never retain keys.
+    private static ReplayState replay(NetHandlerPlayServer connection) {
+        ReplayState state=REPLAY.get(connection);
+        if(state==null) { state=new ReplayState(); REPLAY.put(connection,state); }
+        return state;
+    }
     private CharacterNetwork() {}
     public static void init() {
         if(initialized) return; initialized=true;
@@ -38,6 +66,8 @@ public final class CharacterNetwork {
         CHANNEL.registerMessage(SnapshotHandler.class,Snapshot.class,1,Side.CLIENT);
         CHANNEL.registerMessage(SkillRequestHandler.class,SkillRequest.class,2,Side.SERVER);
         CHANNEL.registerMessage(SkillSnapshotHandler.class,SkillSnapshot.class,3,Side.CLIENT);
+        CHANNEL.registerMessage(AttributeHandler.class,AttributeRequest.class,4,Side.SERVER);
+        CHANNEL.registerMessage(AttributeSnapshotHandler.class,AttributeSnapshot.class,5,Side.CLIENT);
         if(FMLCommonHandler.instance().getSide()==Side.CLIENT) initClient();
     }
     @SideOnly(Side.CLIENT) private static void initClient() { CharacterClient.init(); }
@@ -55,15 +85,20 @@ public final class CharacterNetwork {
     }
     public static final class ActionHandler implements IMessageHandler<Action,IMessage> {
         public IMessage onMessage(Action msg,MessageContext context) {
-            EntityPlayerMP p=context.getServerHandler().player;
-            if(p==null || msg.type<0 || msg.type>2 || !reserve(p)) return null;
+            net.minecraft.network.NetHandlerPlayServer connection=context.getServerHandler();
+            EntityPlayerMP p=connection.player;
+            if(p==null || msg.type<0 || msg.type>4 || msg.type==1 || !reserve(p)) return null;
+            net.minecraft.world.WorldServer world=p.getServerWorld();
             try {
-                p.getServerWorld().addScheduledTask(() -> {
+                world.addScheduledTask(() -> {
                     try {
-                        if(p.hasDisconnected()||p.isDead) return;
+                        // A queued packet must never mutate a replaced player or a new dimension.
+                        if(p.hasDisconnected() || p.connection!=connection || connection.player!=p || p.world!=world || p.isDead) return;
+                        // Sync is read-only; only living, non-spectating players may mutate.
+                        if(msg.type!=2 && (!p.isEntityAlive() || p.isSpectator())) return;
                         if(msg.type==0) CharacterProfile.select(p,msg.value);
-                        else if(msg.type==1) CharacterProfile.allocate(p,msg.value);
-                        else CharacterProfile.sync(p);
+                        else if(msg.type==2) CharacterProfile.sync(p);
+                        else SkillTreeService.activate(p,msg.type==4);
                     } finally { release(p); }
                 });
             } catch (RuntimeException e) { release(p); throw e; }
@@ -90,16 +125,26 @@ public final class CharacterNetwork {
     }
     public static final class SkillRequestHandler implements IMessageHandler<SkillRequest,IMessage> {
         public IMessage onMessage(SkillRequest msg,MessageContext context) {
-            EntityPlayerMP p=context.getServerHandler().player;
+            net.minecraft.network.NetHandlerPlayServer connection=context.getServerHandler();
+            EntityPlayerMP p=connection.player;
             if(p==null || !reserve(p)) return null;
+            net.minecraft.world.WorldServer world=p.getServerWorld();
             try {
-                p.getServerWorld().addScheduledTask(() -> {
+                world.addScheduledTask(() -> {
                     try {
-                        if(p.hasDisconnected() || p.connection==null) return;
-                        String result="";
-                        if(msg.nodeIndex!=-1) {
-                            if(msg.nodeIndex<0 || msg.nodeIndex>=SkillTree.allNodes().size()) result="Habilidade desconhecida.";
-                            else result=SkillTreeService.allocate(p,SkillTree.allNodes().get(msg.nodeIndex).id);
+                        if(p.hasDisconnected() || p.connection!=connection || connection.player!=p || p.world!=world) return;
+                        ReplayState state=replay(connection);
+                        int decision=state.skill(msg.session,msg.sequence,msg.nodeIndex);
+                        String result;
+                        if(decision<0) result="Solicitação antiga ou inválida; atualize as habilidades.";
+                        else if(decision==0) result=state.result;
+                        else {
+                            result="";
+                            if(msg.nodeIndex!=-1) {
+                                if(msg.nodeIndex<0 || msg.nodeIndex>=SkillTree.allNodes().size()) result="Habilidade desconhecida.";
+                                else result=SkillTreeService.allocate(p,SkillTree.allNodes().get(msg.nodeIndex).id);
+                            }
+                            state.result=result;
                         }
                         NBTTagCompound data=SkillTreeService.snapshot(p);
                         data.setString("result",result);
@@ -110,13 +155,68 @@ public final class CharacterNetwork {
             return null;
         }
     }
+    @SideOnly(Side.CLIENT) static void requestAttribute(long sequence,int stat) {
+        CHANNEL.sendToServer(new AttributeRequest(sequence,stat));
+    }
+    public static final class AttributeRequest implements IMessage {
+        long sequence; int stat;
+        public AttributeRequest() {}
+        AttributeRequest(long sequence,int stat) { this.sequence=sequence; this.stat=stat; }
+        public void fromBytes(ByteBuf b) { sequence=b.readLong(); stat=b.readInt(); }
+        public void toBytes(ByteBuf b) { b.writeLong(sequence); b.writeInt(stat); }
+    }
+    public static final class AttributeSnapshot implements IMessage {
+        long sequence; boolean accepted; NBTTagCompound data;
+        public AttributeSnapshot() {}
+        AttributeSnapshot(long sequence,boolean accepted,NBTTagCompound data) {
+            this.sequence=sequence; this.accepted=accepted; this.data=data;
+        }
+        public void fromBytes(ByteBuf b) { sequence=b.readLong(); accepted=b.readBoolean(); data=ByteBufUtils.readTag(b); }
+        public void toBytes(ByteBuf b) { b.writeLong(sequence); b.writeBoolean(accepted); ByteBufUtils.writeTag(b,data); }
+    }
+    public static final class AttributeHandler implements IMessageHandler<AttributeRequest,IMessage> {
+        public IMessage onMessage(AttributeRequest msg,MessageContext context) {
+            NetHandlerPlayServer connection=context.getServerHandler(); EntityPlayerMP p=connection.player;
+            if(p==null || !reserve(p)) return null;
+            net.minecraft.world.WorldServer world=p.getServerWorld();
+            try {
+                world.addScheduledTask(() -> {
+                    try {
+                        if(p.hasDisconnected() || p.connection!=connection || connection.player!=p || p.world!=world) return;
+                        ReplayState state=replay(connection); int decision=state.attribute(msg.sequence,msg.stat);
+                        if(decision>0) state.attributeResult=msg.stat>=0 && msg.stat<CharacterProfile.STATS.length
+                            && p.isEntityAlive() && !p.isSpectator() && CharacterProfile.allocate(p,msg.stat);
+                        boolean accepted=decision>=0 && state.attributeResult;
+                        CHANNEL.sendTo(new AttributeSnapshot(msg.sequence,accepted,CharacterProfile.root(p).copy()),p);
+                    } finally { release(p); }
+                });
+            } catch(RuntimeException e) { release(p); throw e; }
+            return null;
+        }
+    }
+    public static final class AttributeSnapshotHandler implements IMessageHandler<AttributeSnapshot,IMessage> {
+        public IMessage onMessage(AttributeSnapshot msg,MessageContext context) { receiveAttribute(msg,context); return null; }
+        @SideOnly(Side.CLIENT) private static void receiveAttribute(AttributeSnapshot msg,MessageContext context) {
+            net.minecraft.client.Minecraft mc=net.minecraft.client.Minecraft.getMinecraft();
+            net.minecraft.client.network.NetHandlerPlayClient connection=context.getClientHandler();
+            net.minecraft.entity.player.EntityPlayer player=mc.player; net.minecraft.world.World world=mc.world;
+            mc.addScheduledTask(() -> {
+                if(connection!=null && connection==mc.getConnection() && player!=null && player==mc.player
+                    && world!=null && world==mc.world)
+                    CharacterClient.receiveAttribute(msg.sequence,msg.accepted,msg.data);
+            });
+        }
+    }
     public static final class SkillSnapshotHandler implements IMessageHandler<SkillSnapshot,IMessage> {
         public IMessage onMessage(SkillSnapshot msg,MessageContext context) { receiveSkills(msg,context); return null; }
         @SideOnly(Side.CLIENT) private static void receiveSkills(SkillSnapshot msg,MessageContext context) {
             net.minecraft.client.Minecraft mc=net.minecraft.client.Minecraft.getMinecraft();
             net.minecraft.client.network.NetHandlerPlayClient connection=context.getClientHandler();
+            net.minecraft.entity.player.EntityPlayer player=mc.player;
+            net.minecraft.world.World world=mc.world;
             mc.addScheduledTask(() -> {
-                if(connection!=null && connection==mc.getConnection() && mc.player!=null && mc.currentScreen instanceof CharacterRpgScreen)
+                if(connection!=null && connection==mc.getConnection() && player!=null && player==mc.player
+                    && world!=null && world==mc.world && mc.currentScreen instanceof CharacterRpgScreen)
                     ((CharacterRpgScreen)mc.currentScreen).receiveSkills(msg.session,msg.sequence,msg.data);
             });
         }
@@ -127,8 +227,10 @@ public final class CharacterNetwork {
             net.minecraft.client.Minecraft mc=net.minecraft.client.Minecraft.getMinecraft();
             net.minecraft.client.network.NetHandlerPlayClient connection=context.getClientHandler();
             net.minecraft.entity.player.EntityPlayer player=mc.player;
+            net.minecraft.world.World world=mc.world;
             mc.addScheduledTask(() -> {
-                if(connection!=null && connection==mc.getConnection() && player!=null && player==mc.player)
+                if(connection!=null && connection==mc.getConnection() && player!=null && player==mc.player
+                    && world!=null && world==mc.world)
                     CharacterClient.receive(msg.data);
             });
         }
