@@ -157,10 +157,31 @@ public final class ExplorationGenerator implements IWorldGenerator {
             }
         }
         if (type == 0) {
-            // Two rooms with one randomized opening, chest on the far side.
-            int doorway = 5 + r.nextInt(6);
-            for (int x = 4; x <= 11; x++) if (x != doorway)
-                for (int h = 1; h <= 3; h++) put(out, ox+x, y+h, oz+7, Blocks.MOSSY_COBBLESTONE);
+            // A compact surface dungeon: three connected sections, with a split
+            // middle section. The two crosswalls and their doorways are random;
+            // the middle partition has its own opening so neither side is trapped.
+            int divider = 6 + r.nextInt(4);
+            for (int z : new int[]{6, 9}) {
+                // Do not open into the partition or directly into the chest.
+                List<Integer> choices = new ArrayList<Integer>();
+                for (int x = 4; x <= 11; x++)
+                    if (x != divider && (z != 9 || x != 8)) choices.add(x);
+                int doorway = choices.get(r.nextInt(choices.size()));
+                for (int x = 4; x <= 11; x++) for (int h = 1; h <= 3; h++) {
+                    if (x == doorway && h <= 2) continue;
+                    put(out, ox+x, y+h, oz+z, Blocks.MOSSY_COBBLESTONE);
+                }
+            }
+            int passage = 7 + r.nextInt(2);
+            for (int z = 7; z <= 8; z++) for (int h = 1; h <= 3; h++) {
+                if (z == passage && h <= 2) continue;
+                put(out, ox+divider, y+h, oz+z, Blocks.MOSSY_COBBLESTONE);
+            }
+            // Roof sits above the two-block-high passages and the loot chest.
+            // Fixed lights prevent the enclosed rooms from becoming pitch black.
+            for (int x = 4; x <= 11; x++) for (int z = 4; z <= 11; z++)
+                put(out, ox+x, y+4, oz+z,
+                    (x == 5 && z == 5) || (x == 10 && z == 10) ? Blocks.GLOWSTONE : primary);
         } else if (type == 2) {
             for (int x : new int[]{4, 11}) for (int z : new int[]{4, 11})
                 put(out, ox+x, y+4, oz+z, Blocks.GLOWSTONE);
